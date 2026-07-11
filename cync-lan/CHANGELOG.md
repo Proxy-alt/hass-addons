@@ -1,3 +1,9 @@
+### 0.0.6b17
+- Built from [Proxy-alt/cync-lan@python](https://github.com/Proxy-alt/cync-lan/tree/python) instead of upstream, pending PR back to baudneo/cync-lan
+- Downgrade benign `0x83` broadcast warnings (unbound `fa 8e` control bytes, internal status for unmapped room/group IDs) to debug, they fired at WARNING for every device on every mesh broadcast despite being safe to ignore
+- Add device type 36 (dimmable light switch) and 96 (standalone motion sensor, unsupported) so they show real metadata in HASS instead of "no metadata"
+- Reclassify device type 53 "Toggle Switch" from a dimmable light to a binary switch, it's used interchangeably for fan- and light-wired switches with no dimming capability
+
 ### 0.0.6b16
 - NOTE: always backup, I am a carpenter who does this in my spare time, not a software engineer
 - Properly catch and parse fan controller state changes, was missing physical button presses. Thanks [@SamHartleyFixes](https://github.com/baudneo/cync-lan/commits?author=SamHartleyFixes)

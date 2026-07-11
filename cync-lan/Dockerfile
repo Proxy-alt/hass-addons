@@ -24,7 +24,7 @@ RUN set -x \
     && apk add --no-cache --no-interactive \
         git \
     && pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir "git+https://github.com/baudneo/cync-lan@python" \
+    && pip install --no-cache-dir "git+https://github.com/Proxy-alt/cync-lan@python" \
     && apk del --no-interactive --purge \
         git \
     && rm -rf /var/cache/apk/*
