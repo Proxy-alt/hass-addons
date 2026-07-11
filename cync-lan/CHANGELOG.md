@@ -1,3 +1,6 @@
+### 0.0.6b18
+- Fix duplicate entities in HA after a device's platform classification changes (e.g. the type 53 light->switch fix in 0.0.6b17 left the old `light` entity behind alongside the new `switch` one). Stale platform discovery configs now clear automatically on the next discovery announce, no manual entity removal needed in HA.
+
 ### 0.0.6b17
 - Built from [Proxy-alt/cync-lan@python](https://github.com/Proxy-alt/cync-lan/tree/python) instead of upstream, pending PR back to baudneo/cync-lan
 - Downgrade benign `0x83` broadcast warnings (unbound `fa 8e` control bytes, internal status for unmapped room/group IDs) to debug, they fired at WARNING for every device on every mesh broadcast despite being safe to ignore
