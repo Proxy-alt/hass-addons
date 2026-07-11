@@ -1,3 +1,6 @@
+### 0.0.6b19
+- Plugs/outlets now show up in HA with the outlet icon (`device_class: outlet`) instead of the generic switch toggle icon
+
 ### 0.0.6b18
 - Fix duplicate entities in HA after a device's platform classification changes (e.g. the type 53 light->switch fix in 0.0.6b17 left the old `light` entity behind alongside the new `switch` one). Stale platform discovery configs now clear automatically on the next discovery announce, no manual entity removal needed in HA.
 
