@@ -1,3 +1,6 @@
+### 0.0.6b23
+- Two more benign `0x83` broadcast patterns (`fa af`, and `fa db` with a non-status sub-type) downgraded from WARNING spam to debug — both fire in bursts across many devices when the Cync phone app connects/disconnects from the BTLE mesh, not an actual problem
+
 ### 0.0.6b22
 - Per-device "MITM Mode" switch entities no longer show up in HA by default (new `MITM Mode Entities` option, off by default). Existing installs will have any previously-created MITM switch entities automatically removed on next restart.
 
