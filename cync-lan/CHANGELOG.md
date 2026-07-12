@@ -1,3 +1,6 @@
+### 0.0.6b24
+- One more benign broadcast pattern (`fa f0`) downgraded to debug alongside `fa af`, same app-BTLE-connect noise
+
 ### 0.0.6b23
 - Two more benign `0x83` broadcast patterns (`fa af`, and `fa db` with a non-status sub-type) downgraded from WARNING spam to debug — both fire in bursts across many devices when the Cync phone app connects/disconnects from the BTLE mesh, not an actual problem
 
