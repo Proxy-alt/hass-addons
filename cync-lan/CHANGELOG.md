@@ -1,3 +1,6 @@
+### 0.0.6b22
+- Per-device "MITM Mode" switch entities no longer show up in HA by default (new `MITM Mode Entities` option, off by default). Existing installs will have any previously-created MITM switch entities automatically removed on next restart.
+
 ### 0.0.6b21
 - Fix the bridge's "Should Restart" diagnostic entity carrying a leftover mismatched platform key from a copy-paste; harmless but incorrect
 

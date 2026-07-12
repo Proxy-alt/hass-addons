@@ -45,6 +45,9 @@ configuration:
   dev_mitm_console:
     name: Device MITM Console
     description: "Show MITM proxy requests from/to all Cync devices in the log console (default: true)"
+  mitm_entities:
+    name: MITM Mode Entities
+    description: "Expose a per-device 'MITM Mode' switch entity in HA. Off by default, MITM mode itself still works via raw MQTT if needed (default: false)"
   cync_cloud_ip:
     name: Cync Cloud IP
     description: "The IP address of the Cync cloud server (default: 34.73.130.191)"
