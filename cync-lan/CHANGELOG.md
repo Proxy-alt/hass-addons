@@ -1,3 +1,6 @@
+### 0.0.6b26
+- Temporary diagnostic logging (raw_debug only) added to investigate spurious "unknown device ID: 0" warnings seen during a full mesh reconnect; no user-facing change
+
 ### 0.0.6b25
 - New "Cync App Active" occupancy entity on the CyncLAN Bridge device — turns on when the Cync phone app connects to the BTLE mesh, auto-clears after 60s of inactivity
 
