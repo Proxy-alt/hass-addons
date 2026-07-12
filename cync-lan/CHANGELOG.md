@@ -1,3 +1,6 @@
+### 0.0.6b25
+- New "Cync App Active" occupancy entity on the CyncLAN Bridge device — turns on when the Cync phone app connects to the BTLE mesh, auto-clears after 60s of inactivity
+
 ### 0.0.6b24
 - One more benign broadcast pattern (`fa f0`) downgraded to debug alongside `fa af`, same app-BTLE-connect noise
 
