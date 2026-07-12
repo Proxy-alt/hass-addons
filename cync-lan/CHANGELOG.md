@@ -1,3 +1,6 @@
+### 0.0.6b21
+- Fix the bridge's "Should Restart" diagnostic entity carrying a leftover mismatched platform key from a copy-paste; harmless but incorrect
+
 ### 0.0.6b20
 - Fix a few silent bugs found in a type/classification audit: 4 device types were missing their model number (typo in the source dropped it without error) and switches created without an explicit dimmable flag (plugs, fan controller, toggle switches) carried the wrong internal default. Neither was visible in HA, but both are now correct at the data level.
 
