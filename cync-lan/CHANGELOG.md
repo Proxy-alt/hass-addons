@@ -1,3 +1,6 @@
+### 0.0.6b41
+- Fix the raw-debug broadcast status decoder silently dropping a device from its output whenever a `0x2e` byte happened to appear anywhere in the packet (an incorrect heuristic bumped the per-device chunk size from 19 to 20 bytes). Confirmed via a real 2-device broadcast capture where only the first device decoded; the fix always uses the correct 19-byte size. Debug-output only - doesn't affect live device state or MQTT, but it's the exact tool used to read raw captures for bug reports
+
 ### 0.0.6b40
 - Recognize deviceType 112 "Wireless Switch" (battery-powered BTLE scene remote with a status LED ring) instead of reporting it as never-seen-before. It's now known but marked unsupported - a live capture test showed pressing it produces no packet visible to the bridge, so it likely drives its paired light directly over the BTLE mesh; nothing to implement yet without real packet data
 
