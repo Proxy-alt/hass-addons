@@ -1,3 +1,6 @@
+### 0.0.6b34
+- Fix a substantial source of silently-dropped device state updates: devices sometimes deliver their status wrapped in a `0x73` packet instead of the usual `0x83`, using the exact same inner format - nothing recognized this variant, so it was only ever acknowledged, never parsed. Found via the new debug capture tool (97% of one capture session was this single pattern); confirmed by hand-decoding a real sample back to a known device with sensible values
+
 ### 0.0.6b33
 - New "Unsupported Device Debug Capture" option: logs raw packets from never-seen or unsupported device types to a dedicated file (`unsupported_devices.log`), independent of Raw Debug. Safe to leave on for an extended/overnight capture without the noise of full raw debugging - useful for gathering data to get a new device type properly supported
 - The capture also now covers packets that don't resolve to a device ID at all (an unrecognized top-level packet header, or unrecognized control bytes on a `0x83`/`0x73` packet) - not something most people will ever need, but useful if you're gathering data to report a new/unimplemented device type to the maintainer
