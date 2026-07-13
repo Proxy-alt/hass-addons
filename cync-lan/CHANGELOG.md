@@ -1,3 +1,6 @@
+### 0.0.6b30
+- Temporary diagnostic logging (raw_debug only) added to investigate a suspicious "unknown device ID: 0" status pattern with non-boolean field values (possibly a motion sensor or other unrecognized device type); no user-facing change
+
 ### 0.0.6b29
 - The 0.0.6b28 "node_id MISMATCH" fix didn't hold up in a follow-up capture. Root-caused further: the underlying assumption (first MeshInfo entry = the requesting device) is simply false, not just mishandled pagination - confirmed by specific bridges consistently reporting the same "wrong" device across unrelated reconnects. Removed the check entirely rather than patch it again
 
