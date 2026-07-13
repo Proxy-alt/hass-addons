@@ -1,5 +1,5 @@
 name: "CyncLAN Bridge"
-version: "0.0.6b27"
+version: "0.0.6b28"
 slug: "cync-lan"
 description: "Local controller for Cync/C by GE smart devices (DNS redirection required)"
 arch:

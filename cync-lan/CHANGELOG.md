@@ -1,3 +1,6 @@
+### 0.0.6b28
+- Fix spurious "node_id MISMATCH" warnings on paginated MeshInfo reconnects, confirmed via a fresh post-0.0.6b27 capture. Cosmetic only (no data was affected), but a real logic bug in how the parser detected "device announcing itself" across paginated dumps
+
 ### 0.0.6b27
 - Fix spurious "unknown device ID: 0" warnings (and the state loss they implied) during MeshInfo parsing on reconnect. Root-caused to duplicate BTLE relay-path entries desyncing the parser's fixed-stride byte offsets; it now self-resyncs instead of reading garbage for the rest of that page
 
