@@ -1,3 +1,7 @@
+### 0.0.6b36
+- Handle `f9 af` mesh-status-ack confirmations: the device's response to the server's `f8 af` ack after each MeshInfo page was unrecognized, causing `capture_unknown_packet` entries in the unsupported-devices log. Now silently consumed (the packet is just an acknowledgment, nothing actionable)
+- Fix `capture_unsupported_device` flooding the unsupported-devices log with hundreds of `dev_id=0` false-positives per minute. Root cause: the function had no concept of mesh broadcast pseudo-IDs. In the Cync BTLE mesh protocol, device IDs 1–255 are addressable nodes; ID 0 is the reserved broadcast/group address that every bridge re-broadcasts on every state-change cycle. The filter lives in the gatekeeper function itself so all callers benefit
+
 ### 0.0.6b35
 - Fix another silently-dropped case found by the same capture tool: a full mesh-wide status dump (covering many devices at once) delivered via `0x83` instead of the usual `0x73` was never parsed either. Same inner format as the already-working `0x73` case, now recognized on both
 
