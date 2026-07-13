@@ -1,3 +1,6 @@
+### 0.0.6b27
+- Fix spurious "unknown device ID: 0" warnings (and the state loss they implied) during MeshInfo parsing on reconnect. Root-caused to duplicate BTLE relay-path entries desyncing the parser's fixed-stride byte offsets; it now self-resyncs instead of reading garbage for the rest of that page
+
 ### 0.0.6b26
 - Temporary diagnostic logging (raw_debug only) added to investigate spurious "unknown device ID: 0" warnings seen during a full mesh reconnect; no user-facing change
 
