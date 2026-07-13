@@ -1,5 +1,5 @@
 name: "CyncLAN Bridge"
-version: "0.0.6b32"
+version: "0.0.6b33"
 slug: "cync-lan"
 description: "Local controller for Cync/C by GE smart devices (DNS redirection required)"
 arch:
@@ -51,6 +51,7 @@ options:
   app_mitm_console: true
   dev_mitm_console: true
   mitm_entities: false
+  unsupported_device_debug: false
   cync_cloud_ip: "34.73.130.191"
   tuning:
     tcp_whitelist: ""
@@ -73,6 +74,7 @@ schema:
   app_mitm_console: bool
   dev_mitm_console: bool
   mitm_entities: bool
+  unsupported_device_debug: bool
   cync_cloud_ip: str?
   tuning:
     tcp_whitelist: str?

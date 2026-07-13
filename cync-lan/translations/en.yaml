@@ -48,6 +48,9 @@ configuration:
   mitm_entities:
     name: MITM Mode Entities
     description: "Expose a per-device 'MITM Mode' switch entity in HA. Off by default, MITM mode itself still works via raw MQTT if needed (default: false)"
+  unsupported_device_debug:
+    name: Unsupported Device Debug Capture
+    description: "Log raw packets from devices with no metadata (never-seen deviceType) or marked unsupported to a dedicated file (unsupported_devices.log), independent of Raw Debug. Safe to leave on for an extended capture (e.g. overnight) to gather data for adding support for a new device type (default: false)"
   cync_cloud_ip:
     name: Cync Cloud IP
     description: "The IP address of the Cync cloud server (default: 34.73.130.191)"
