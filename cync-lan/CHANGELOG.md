@@ -1,3 +1,6 @@
+### 0.0.6b29
+- The 0.0.6b28 "node_id MISMATCH" fix didn't hold up in a follow-up capture. Root-caused further: the underlying assumption (first MeshInfo entry = the requesting device) is simply false, not just mishandled pagination - confirmed by specific bridges consistently reporting the same "wrong" device across unrelated reconnects. Removed the check entirely rather than patch it again
+
 ### 0.0.6b28
 - Fix spurious "node_id MISMATCH" warnings on paginated MeshInfo reconnects, confirmed via a fresh post-0.0.6b27 capture. Cosmetic only (no data was affected), but a real logic bug in how the parser detected "device announcing itself" across paginated dumps
 
