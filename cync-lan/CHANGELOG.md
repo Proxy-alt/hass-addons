@@ -1,3 +1,7 @@
+### 0.0.6b38
+- Fix standalone BTLE-only accessories (e.g. motion sensors, type 96) being silently dropped from the exported config entirely. The cloud export required a `wifiMac` for every device, but these accessories have no WiFi radio and never have one - confirmed via a real export showing a motion sensor's raw entry with no `wifiMac` field at all. Now optional; devices that lack WiFi already route around it downstream
+- Fix motion sensor `binary_sensor` entities showing "Unknown" in HASS until their first real detection ever fired. State publishes are now retained, and a retained OFF is seeded at discovery time if nothing has been published yet
+
 ### 0.0.6b37
 - Real motion sensor support, from two independently-confirmed real-world captures: standalone Cync motion sensor accessories (type 96) now show up as a proper `binary_sensor` (occupancy), and light/switch models with a built-in occupancy sensor ("...with Motion and Ambient Light", types 37/49/56) get an extra motion `binary_sensor` alongside their existing light entity
 
