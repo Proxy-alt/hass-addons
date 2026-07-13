@@ -1,5 +1,6 @@
 ### 0.0.6b33
 - New "Unsupported Device Debug Capture" option: logs raw packets from never-seen or unsupported device types to a dedicated file (`unsupported_devices.log`), independent of Raw Debug. Safe to leave on for an extended/overnight capture without the noise of full raw debugging - useful for gathering data to get a new device type properly supported
+- The capture also now covers packets that don't resolve to a device ID at all (an unrecognized top-level packet header, or unrecognized control bytes on a `0x83`/`0x73` packet) - not something most people will ever need, but useful if you're gathering data to report a new/unimplemented device type to the maintainer
 
 ### 0.0.6b32
 - Fix "Unknown packet header" warnings and the real device status updates they were silently discarding. Root-caused via a real capture: when a TCP read boundary split a packet's header across two reads, the short fragment got processed as "complete" instead of buffered, misaligning everything that followed in the next read
