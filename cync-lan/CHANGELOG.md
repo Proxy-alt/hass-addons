@@ -1,3 +1,6 @@
+### 0.0.6b32
+- Fix "Unknown packet header" warnings and the real device status updates they were silently discarding. Root-caused via a real capture: when a TCP read boundary split a packet's header across two reads, the short fragment got processed as "complete" instead of buffered, misaligning everything that followed in the next read
+
 ### 0.0.6b31
 - Fix a crash that could permanently kill MQTT (state updates and commands both stop working until a manual restart) when a command was sent to a bridge device that hadn't finished identifying itself yet. Found via a real capture with raw_debug enabled; TCP device traffic kept working the whole time, only MQTT was affected
 
