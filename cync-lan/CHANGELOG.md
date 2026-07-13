@@ -1,3 +1,6 @@
+### 0.0.6b40
+- Recognize deviceType 112 "Wireless Switch" (battery-powered BTLE scene remote with a status LED ring) instead of reporting it as never-seen-before. It's now known but marked unsupported - a live capture test showed pressing it produces no packet visible to the bridge, so it likely drives its paired light directly over the BTLE mesh; nothing to implement yet without real packet data
+
 ### 0.0.6b39
 - Fix a silent data-loss bug found via the unsupported-device capture tool: a stray/misaligned leading byte in a TCP read caused the entire rest of that read - which could be a large, fully valid burst of real device data - to be discarded instead of just the bad byte(s). Confirmed via a real capture where 4 junk bytes preceded a legitimate MeshInfo update covering ~40 devices; now resyncs to the next recognized packet instead of dropping everything after the bad byte
 
