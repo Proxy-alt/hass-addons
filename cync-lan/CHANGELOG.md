@@ -1,3 +1,6 @@
+### 0.0.6b35
+- Fix another silently-dropped case found by the same capture tool: a full mesh-wide status dump (covering many devices at once) delivered via `0x83` instead of the usual `0x73` was never parsed either. Same inner format as the already-working `0x73` case, now recognized on both
+
 ### 0.0.6b34
 - Fix a substantial source of silently-dropped device state updates: devices sometimes deliver their status wrapped in a `0x73` packet instead of the usual `0x83`, using the exact same inner format - nothing recognized this variant, so it was only ever acknowledged, never parsed. Found via the new debug capture tool (97% of one capture session was this single pattern); confirmed by hand-decoding a real sample back to a known device with sensible values
 
