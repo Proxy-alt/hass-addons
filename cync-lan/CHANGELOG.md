@@ -1,3 +1,6 @@
+### 0.0.6b31
+- Fix a crash that could permanently kill MQTT (state updates and commands both stop working until a manual restart) when a command was sent to a bridge device that hadn't finished identifying itself yet. Found via a real capture with raw_debug enabled; TCP device traffic kept working the whole time, only MQTT was affected
+
 ### 0.0.6b30
 - Temporary diagnostic logging (raw_debug only) added to investigate a suspicious "unknown device ID: 0" status pattern with non-boolean field values (possibly a motion sensor or other unrecognized device type); no user-facing change
 
