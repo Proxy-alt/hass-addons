@@ -1,3 +1,6 @@
+### 0.0.6b43
+- Support deviceType 112 "Wireless Switch" for real. Previously marked unsupported after a toggle test showed nothing in the debug log, but that was a false negative - a real capture confirms it sends a normal status packet when pressed (recently_seen goes 1->0 ~19s later, same shape as the type-96 motion sensor's trigger flag). Now exposed as an `occupancy` binary_sensor via the existing motion-sensor pipeline
+
 ### 0.0.6b42
 - Fix every entity showing a blank Entity ID in HASS. HASS deprecated using `object_id` to set an entity's ID and now requires `default_entity_id` to be the *full* domain-prefixed entity_id (e.g. `light.cync_lan_...`), not a bare slug - this project was sending the bare slug for every entity, which HASS silently rejected. **Existing entities won't rename themselves** - delete them from the HA entity registry (or delete the Cync-LAN Bridge device and your Cync devices, then let discovery republish) to pick up a valid entity_id
 
