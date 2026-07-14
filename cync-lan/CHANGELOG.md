@@ -1,3 +1,6 @@
+### 0.0.6b44
+- Correct deviceType 112's model name to "Wire-Free Dimmer Switch" (owner-confirmed) - it's a battery-powered dimmer, not a generic scene remote
+
 ### 0.0.6b43
 - Support deviceType 112 "Wireless Switch" for real. Previously marked unsupported after a toggle test showed nothing in the debug log, but that was a false negative - a real capture confirms it sends a normal status packet when pressed (recently_seen goes 1->0 ~19s later, same shape as the type-96 motion sensor's trigger flag). Now exposed as an `occupancy` binary_sensor via the existing motion-sensor pipeline
 
