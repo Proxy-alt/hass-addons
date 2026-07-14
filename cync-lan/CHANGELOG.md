@@ -1,3 +1,6 @@
+### 0.0.6b42
+- Fix every entity showing a blank Entity ID in HASS. HASS deprecated using `object_id` to set an entity's ID and now requires `default_entity_id` to be the *full* domain-prefixed entity_id (e.g. `light.cync_lan_...`), not a bare slug - this project was sending the bare slug for every entity, which HASS silently rejected. **Existing entities won't rename themselves** - delete them from the HA entity registry (or delete the Cync-LAN Bridge device and your Cync devices, then let discovery republish) to pick up a valid entity_id
+
 ### 0.0.6b41
 - Fix the raw-debug broadcast status decoder silently dropping a device from its output whenever a `0x2e` byte happened to appear anywhere in the packet (an incorrect heuristic bumped the per-device chunk size from 19 to 20 bytes). Confirmed via a real 2-device broadcast capture where only the first device decoded; the fix always uses the correct 19-byte size. Debug-output only - doesn't affect live device state or MQTT, but it's the exact tool used to read raw captures for bug reports
 
