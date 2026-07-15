@@ -1,5 +1,8 @@
-### 0.0.6b44
-- Correct deviceType 112's model name to "Wire-Free Dimmer Switch" (owner-confirmed) - it's a battery-powered dimmer, not a generic scene remote
+### 0.0.6b45
+- Fix sol-lamp brightness changes not updating in HA immediately: the ack-matching allow-list was missing the `0xD2` op sol-lamp devices use for brightness, so their acks went unrecognized and HA's brightness slider stayed stale until an unrelated status update happened to correct it. Confirmed against the real Cync Android app's decompiled command encoding
+- Fix the "fireworks" light-show effect sending the wrong effect ID (`0x3A`/58, not valid anywhere in the real app's effect scheme) instead of the correct ID (`3`) - likely silently rejected by real hardware before this fix
+- Reclassify every 4-wire wired switch type (dimmer, toggle, circle, paddle, motion-sensing, keypad, no-neutral and TCO variants) from `light` to `switch`, and remove incorrectly-claimed color/tunable-white (and in some cases dimmable) capabilities - cross-referenced against the real Cync Android app's device-type data, which confirmed none of these switch types actually support color, and several don't dim at all. Also corrected two swapped model names (types 52/53 Toggle vs Circle, and the "Paddle" label between types 48/125)
+- Recognize 54 additional Cync device types that were completely missing from the device-type table (newer-generation bulbs, switch Gen2/Gen3/TCO variants, outdoor/TCO plugs, a second fan controller and thermostat variant, dynamic-effects fixtures, wafer downlights, wire-free remotes, and cameras) - sourced from the full real Cync Android app device-type catalog
 
 ### 0.0.6b43
 - Support deviceType 112 "Wireless Switch" for real. Previously marked unsupported after a toggle test showed nothing in the debug log, but that was a false negative - a real capture confirms it sends a normal status packet when pressed (recently_seen goes 1->0 ~19s later, same shape as the type-96 motion sensor's trigger flag). Now exposed as an `occupancy` binary_sensor via the existing motion-sensor pipeline
