@@ -1,5 +1,5 @@
 >[!IMPORTANT]
-> DNS redirection is REQUIRED, please see [here](https://github.com/baudneo/cync-lan/tree/python/docs/DNS.md) for documentation and examples
+> DNS redirection is REQUIRED, please see [here](https://github.com/Proxy-alt/cync-lan/tree/python/docs/DNS.md) for documentation and examples
 
 >[!WARNING]
 > It is **HIGHLY** recommended that you do **NOT** do any firmware upgrades to Cync devices after running cync-lan. 
@@ -26,17 +26,24 @@ This add-on provides:
 - __comms__: An async `aiomqtt` MQTT client for communication to HASS using the HASS MQTT JSON schema
 
 # Supported devices
-See [known devices](https://github.com/baudneo/cync-lan/tree/python/docs/known_devices.md)
+See [known devices](https://github.com/Proxy-alt/cync-lan/tree/python/docs/known_devices.md)
+for the full, current list.
 
 #### MOSTLY SUPPORTED
 - lights
 - plugs
 - switches
+- fan controllers (on/off, percentage, and preset-speed control, with real
+  state sync back from the device)
+- standalone battery-powered motion sensor accessory, and the battery-powered
+  "Wireless Switch" scene remote - both exposed as `occupancy` binary sensors
 
 #### NOT SUPPORTED
-- Any **battery** powered devices
-    - motion sensors
-    - *wire free* devices
+- Most other battery-powered devices remain BTLE send-only from this add-on's
+  perspective (no way to push settings/firmware to them), aside from the two
+  motion/wireless-switch accessories above
+    - Wire-free light switches/dimmers
+    - Temperature/humidity sensors not bound to a thermostat
 
 #### UNTESTED
 - Cameras
