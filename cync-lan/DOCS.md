@@ -31,8 +31,16 @@ to your Home Assistant server's local IP address. This will trick Cync devices i
 > using the apps ingress page.
 
 1. Configure the Cync account username, account password and MQTT broker connection details in the app configuration.
-2. Start the app
-3. See [exporting device configuration](#exporting-device-configuration)
+2. Set `secret_key` to any random alphanumeric string of your choosing and keep it stable - it encrypts the cached Cync
+   cloud auth token at rest, and changing it later just forces a re-login, nothing more.
+3. Start the app
+4. See [exporting device configuration](#exporting-device-configuration)
+
+>[!NOTE]
+> If you're looking for the newer native Home Assistant integration instead
+> (installed through HACS, no Docker/MQTT/`secret_key` setup at all), see
+> [`custom_components/cync_lan/README.md`](https://github.com/Proxy-alt/cync-lan/tree/feature/ha-custom-component/custom_components/cync_lan/README.md)
+> in the main cync-lan repository - it's a separate installation path from this App.
 
 ---
 
