@@ -1,0 +1,67 @@
+name: Sync cync-lan subtree
+
+# Keeps cync-lan/upstream/ (a git subtree of Proxy-alt/cync-lan's python
+# branch, see RELEASING.md in that repository) up to date, and copies its
+# CHANGELOG.md over cync-lan/CHANGELOG.md so the add-on's own changelog
+# never drifts from the real one again - see cync-lan/README.md's history
+# of that drift for why this exists. Opens a pull request rather than
+# pushing directly to dev, so a human still reviews what changed before it
+# lands (and so the Builder workflow's normal push-triggered build isn't
+# bypassed).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Pull the cync-lan python branch into cync-lan/upstream
+        run: |
+          git subtree pull --prefix=cync-lan/upstream \
+            https://github.com/Proxy-alt/cync-lan.git python --squash \
+            -m "Subtree-sync: pull cync-lan python branch"
+
+      - name: Copy the canonical CHANGELOG.md over the add-on's own copy
+        run: |
+          if ! cmp -s cync-lan/upstream/CHANGELOG.md cync-lan/CHANGELOG.md; then
+            cp cync-lan/upstream/CHANGELOG.md cync-lan/CHANGELOG.md
+            git add cync-lan/CHANGELOG.md
+            git commit -m "Sync cync-lan/CHANGELOG.md from upstream"
+          fi
+
+      - name: Open a pull request with anything that changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: subtree-sync/cync-lan
+          delete-branch: true
+          base: dev
+          title: "Sync cync-lan subtree"
+          body: |
+            Automated pull from [Proxy-alt/cync-lan](https://github.com/Proxy-alt/cync-lan)'s
+            `python` branch (`cync-lan/upstream/`), with `cync-lan/CHANGELOG.md`
+            re-synced from it if it changed.
+
+            `cync-lan/README.md`'s own device-support summary is **not**
+            auto-updated by this workflow (its structure/audience differs
+            from the upstream project's own README) - if `cync-lan/upstream/docs/known_devices.md`
+            changed in this pull, check whether `cync-lan/README.md` needs a
+            manual update to match.
+          commit-message: "Subtree-sync: pull cync-lan python branch"
