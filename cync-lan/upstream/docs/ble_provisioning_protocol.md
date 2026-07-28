@@ -94,14 +94,16 @@ def generate_sk(name, password, data1, data2):  # dimond/__init__.py:37-43
    `SecureRandom` output before use, rather than a genuine fixed value - not fully resolved, but
    `python-dimond`'s account is the one with real-world validation behind it.
 3. Phone reads the pairing characteristic for the device's response and takes bytes `[1:9]` as
-   `R_dev`, the device's own random contribution (`dimond/__init__.py:129,133`). **Correction**: the
-   original pass described an explicit mutual-authentication check (verifying a proof the device
-   sends back) - the real implementation performs **no such verification at all**, it just trusts
-   whatever the device returns and proceeds. Either the real app does check and `python-dimond`
-   simply skips it (plausible - a minimal client doesn't need to replicate defensive checks the
-   official app makes), or the decompile mis-read a different code path as verification; unresolved,
-   but a from-scratch client doesn't need the check either way since `python-dimond` works without
-   it.
+   `R_dev`, the device's own random contribution (`dimond/__init__.py:129,133`). **`python-dimond`
+   itself performs no mutual-auth verification** - it just trusts whatever the device returns and
+   proceeds. **Update, resolved**: a direct read of the real Cync app's own callback
+   (`C2184d.java`'s `DataReceivedCallback`, registered on this exact `ReadRequest` in
+   `TelinkDeviceBleManager.m14334v`) confirms the real app DOES perform this verification -
+   see "Resolved: the real app's mutual-auth check" below. The earlier "unresolved, either the app
+   checks and python-dimond skips it, or the decompile mis-read something" framing is now settled:
+   it's the former. This doesn't change whether a from-scratch client's pairing attempt succeeds
+   (the device doesn't care whether the phone verifies its own response), but it does mean the
+   check is real, confirmed protocol behavior worth replicating as a diagnostic.
 4. Both sides derive **`sessionKey = AES_ECB(key=XOR(meshName, meshPass), data=R_app[0:8] ‖
    R_dev[0:8])`** (`dimond/__init__.py:133`, calling `generate_sk`). The `XOR(meshName, meshPass)`
    key-material claim from the original pass is **confirmed exactly** - only the identity of the two
@@ -116,6 +118,103 @@ def generate_sk(name, password, data1, data2):  # dimond/__init__.py:37-43
 cloud already knows about) - they don't implement new-mesh creation or WiFi handoff, so they provide
 **no cross-validation** for `pairMesh$2.java`'s "hand the device its permanent mesh credentials"
 step or the `SetWifiCommand` chunking scheme below - those remain sourced from the decompile alone.
+
+### Resolved: the real Cync app's `R_app` is a fixed constant, not random - and the exact factory-bootstrap bytes are now confirmed
+
+A follow-up pass through the real Cync app's own `TelinkDeviceBleManager.m14334v` ("authenticate")
+and `Telink.java`'s static initializer closes the "not fully resolved" caveat on step 2 above.
+**The real app's `R_app` is genuinely a fixed constant, not `SecureRandom` output** -
+`Telink.f28877k` is a `final` field, assigned once (`{0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,
+0,0,0,0,0,0,0,0}`), and used as-is at two independent real call sites: the initial pairing write
+(`m14334v`) and the read-response callback that reconstructs the same value to derive the session
+key (`C2184d.mo14353a`). `python-dimond` generating fresh random bytes each session is a difference
+between it and the real app, not a sign the real app also randomizes - both are protocol-compatible
+since the encryption algorithm doesn't require `R_app` to be unique per session, just known to both
+sides deriving the same session key.
+
+`m14334v` has two branches:
+- **name/password exactly the Telink factory defaults** (`"telink_mesh1"`/`"123"`) - the
+  brand-new/never-provisioned-device case: writes a fully pre-baked 17-byte constant
+  (`Telink.f28878l`) verbatim, no computation needed.
+- **otherwise** (re-authenticating against an already-known mesh): computes
+  `[0x0C] + R_app[0:8] + key_encrypt(name, password, key=pad16(R_app))[0:8]` - the same general
+  formula step 2 above already described, just with the fixed `R_app` instead of a random one.
+
+Exact confirmed byte values (`Telink.java`'s static initializer):
+
+```
+R_APP (Telink.f28877k[0:8])        = A0 A1 A2 A3 A4 A5 A6 A7
+FACTORY_DEFAULT_PAIRING_WRITE       = 0C A0 A1 A2 A3 A4 A5 A6 A7 8D B6 74 71 1B 85 5A 79
+  (Telink.f28878l - opcode 0x0C + R_APP + key_encrypt("telink_mesh1","123",key=pad16(R_APP))[0:8])
+DEFAULT_LTK (Telink.f28879m)        = C0 C1 C2 C3 C4 C5 C6 C7 D8 D9 DA DB DC DD DE DF
+```
+
+**Independent confirmation, not just a decompiled literal**: `src/cync_lan/ble_provision.py`'s
+`build_pairing_write("telink_mesh1", "123")` - implementing the general formula above from scratch,
+using the `cryptography` package's AES-ECB primitive - reproduces `FACTORY_DEFAULT_PAIRING_WRITE`
+exactly (see `test_build_pairing_write_reproduces_the_factory_default_constant` in
+`tests/components/cync_lan/test_ble_provision.py`). This is real evidence the crypto
+implementation (byte-reversal quirk, XOR key derivation, padding) is correct, not just internally
+consistent with itself.
+
+The mesh-credential-handoff opcode bytes (`TelinkDeviceBleManager$pairMesh$2.java`) are also now
+fully confirmed by direct read: `4`=NAME, `5`=PASSWORD, `6`=LTK, each written as
+`[opcode] + AES_ECB(sessionKey, pad16(value))[0:8]`, zero-padded to 17 bytes - matching this doc's
+existing "genuinely open" `OPCODE` enum note (`ordinal+1` for `PAIR_NETWORK_NAME`/`PAIR_PASS`/
+`PAIR_LTK` = literals 4/5/6) exactly.
+
+**Practical upshot**: a from-scratch client provisioning a brand-new device never needs to touch
+`SecureRandom` at all for the bootstrap step - `FACTORY_DEFAULT_PAIRING_WRITE` is a fixed constant
+that works for every never-provisioned Telink device, confirmed both from the decompiled source and
+by independently reproducing it from the documented formula.
+
+**Shipped, EXPERIMENTAL, untested against real hardware**: `src/cync_lan/ble_provision.py`
+implements the full flow above (`bleak`-based scan → connect → factory-bootstrap pairing write →
+session-key derivation → target mesh name/password/LTK handoff), exposed as a `cync-lan-ble-provision`
+CLI (`pip install cync_lan[ble]`). Does not yet implement the WiFi credential handoff
+(`SetWifiCommand`) below - only the BLE mesh-join step.
+
+### Resolved: the real app's mutual-auth check, and the pairMesh confirmation byte
+
+A direct read of two real callback classes - not just `python-dimond`'s account, which only
+establishes what a *minimal* client needs to do - closes two more of this doc's own open items.
+
+**The real Cync app DOES verify the device's pairing response** (`C2184d.java`'s
+`DataReceivedCallback`, the callback registered on the `ReadRequest` right after
+`TelinkDeviceBleManager.m14334v`'s pairing write). Contrary to this doc's earlier framing (based
+only on `python-dimond`, which skips this), the shipped app reconstructs an expected proof value
+from the device's own `R_dev` and compares it against what the device actually sent:
+
+```
+r_dev = response[1:9]
+expected_proof = key_encrypt(meshName, meshPass, key=pad16(r_dev))[0:8]
+# real app requires: response[9:17] == expected_proof, else session key is set to null (pairing fails)
+```
+
+This is a **client-side-only** check - the device has no way to know whether the phone validated
+its response, so this cannot be what makes a device accept or reject pairing. A from-scratch client
+that skips it (as `python-dimond` does, and still works) will not be rejected by the device for
+that reason. It's valuable anyway as a diagnostic: if this check fails, something about how `R_dev`
+or the mesh name/password is being interpreted is probably wrong, and would otherwise surface later
+as a much more confusing failure once the (silently-wrong) session key gets used.
+
+**Shipped**: `src/cync_lan/ble_provision.py`'s `verify_pairing_response()` implements this exact
+check, called as a non-fatal diagnostic (logged as a warning, not raised) in `provision_device()`.
+
+**The `pairMesh` confirmation read must check for the literal byte value `7`, not merely
+"nonzero"** (`C2185e.java`'s `DataReceivedCallback`, registered on the final confirmation
+`ReadRequest` in `pairMesh$2.java`): the callback only sets its success flag when
+`response[0] == 7`; any other value - including `0`, and including other plausible-looking nonzero
+values - leaves it `false` ("not confirmed"). This lines up neatly with the same "literal =
+ordinal+1" pattern already confirmed elsewhere in this doc for the NAME/PASSWORD/LTK opcodes
+(`4`/`5`/`6` = enum ordinals `3`/`4`/`5`) - enum ordinal `6` is `PAIR_CONFIRM`, and `6+1=7`, a
+semantically sensible match for "pairing confirmed" under that same hypothesis.
+
+An earlier version of `ble_provision.py` checked `response[0] != 0` here instead of
+`response[0] != PAIR_CONFIRM_BYTE` (`7`) - a real bug (not merely an unconfirmed guess), since it
+would have treated most rejection responses as success. Caught and fixed by re-reading `C2185e.java`
+directly rather than assuming; see `test_provision_device_raises_for_nonzero_but_wrong_confirmation_byte`
+in `tests/components/cync_lan/test_ble_provision.py` for the regression test.
 
 ## Command encryption (post-pairing)
 
@@ -344,22 +443,31 @@ code this pass - but the decompile-internal consistency (the same call paths, th
 routine, the same vendor-ID bytes appearing in three unrelated places) is itself strong internal
 evidence.
 
+**Resolved this pass** (moved out of "genuinely open" below): whether the Cync app performs the
+mutual-auth verification step - **yes**, confirmed via direct read of `C2184d.java` (see "Resolved:
+the real app's mutual-auth check" above), along with the exact `pairMesh` confirmation byte value
+(`7`, not merely "nonzero" - a real bug this caught and fixed in `ble_provision.py`).
+
 **Lower confidence / genuinely open**:
 - Exact semantic mapping of the `Telink.OPCODE` enum's ordinal values to the literal integer opcodes
-  actually used in wire writes (code uses literals, not the enum, at the actual write sites).
+  actually used in wire writes (code uses literals, not the enum, at the actual write sites) - the
+  "ordinal+1" hypothesis now has 5 confirmed data points (opcodes 4/5/6/7 for
+  NAME/PASSWORD/LTK/CONFIRM = ordinals 3/4/5/6, plus the original 11=ENC_REQ), still not exhaustively
+  proven for the remaining ordinals.
 - `f28869c`/`f28871e` (the byte-reversed service/characteristic pair) - purpose not determined.
-- Whether the Cync app itself performs the mutual-auth verification step the original decompile pass
-  described (`python-dimond` doesn't, and doesn't need to) - unresolved, but not blocking for a
-  from-scratch client.
 - Whether an already-provisioned device stops advertising its default name (plausible, not directly
   confirmed via UI strings this pass) - relevant only for a "should already-paired devices ever show
   up in a scan" edge case, not a correctness blocker.
+- `ble_provision.py`'s new-device scan filter doesn't validate the device-type byte the real app
+  checks (`BleDeviceScanner.java`) - only manufacturer-data company ID + advertised name. Looser
+  than the real app's filter, not incorrect, but could surface non-Cync Telink devices in scan
+  results if any happen to be nearby.
 
 **Recommended next steps, in order of cost**: (1) clone `vpaeder/telinkpp` too, as a second
-cross-check on the command-encryption algorithm now confirmed above; (2) an actual prototype attempt
-against real hardware is now reasonable to try directly - discovery, pairing, mesh-join, WiFi
-handoff, and command encryption are all traced end-to-end with either independent library validation
-or thorough internal cross-checking; (3) a live BLE capture during a real pairing session remains
-the way to get full certainty on the couple of remaining lower-confidence items above, same as
-`docs/cloud_independence_research.md`'s original
-recommendation - now scoped to just the provisioning-specific pieces rather than the whole protocol.
+cross-check on the command-encryption algorithm now confirmed above; (2) ~~an actual prototype
+attempt against real hardware is now reasonable to try directly~~ - **done**: `src/cync_lan/ble_provision.py`
+implements discovery + the factory-bootstrap pairing + mesh-credential handoff (not yet WiFi
+handoff), awaiting a real-hardware test result; (3) a live BLE capture during a real pairing session
+remains the way to get full certainty on the couple of remaining lower-confidence items above, same
+as `docs/cloud_independence_research.md`'s original recommendation - now scoped to just the
+provisioning-specific pieces rather than the whole protocol.
