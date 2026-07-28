@@ -25,8 +25,14 @@ export CYNC_MITM_ENTITIES="$(bashio::config 'mitm_entities')"
 export CYNC_UNSUPPORTED_RAW_DEBUG="$(bashio::config 'unsupported_device_debug')"
 export CYNC_MQTT_DEBUG="$(bashio::config 'mqtt_debug')"
 
-# when installing the cync_lan python package, pyproject.toml creates a cync-lan executable
-#cync-lan
-# for some wierd reason, the cync-lan executable does not work in the app container all of a sudden
-#python -c "from cync_lan.main import main; import asyncio; import uvloop; asyncio.set_event_loop_policy(uvloop.EventLoopPolicy()); main()" --enable-export
-python -c "from cync_lan.main import main; main()"
+# The module is cync_lan_mqtt, not cync_lan. cync_lan is the core protocol
+# library and has never had a main module; the add-on's entry point moved when
+# the MQTT daemon was split out into its own package between 0.0.6b45 and
+# 0.2.2. Because the Dockerfile installed from branch HEAD, this line started
+# failing with ModuleNotFoundError on every rebuild without anything changing
+# here.
+#
+# pyproject.toml also installs a `cync-lan` console script, which does work -
+# an older comment here claimed otherwise. The module form is kept because it
+# does not depend on PATH inside the s6 environment.
+python -c "from cync_lan_mqtt.main import main; main()"

@@ -27,16 +27,27 @@ RUN set -x \
     && pip install --no-cache-dir -U pip \
     && rm -rf /var/cache/apk/*
 
+# Pinned to a release on PyPI, not to a git branch.
+#
+# This used to install `git+https://github.com/Proxy-alt/cync-lan@python`,
+# which resolves to whatever happens to be on that branch at build time - and
+# because config.yaml carries no `image:` key, that build runs on each user's
+# own Home Assistant machine, whenever they install or update. So the code
+# people received depended on the day they pressed the button, with nothing
+# recording which revision they got.
+#
+# It had already broken. The package was renamed cync_lan -> cync_lan_mqtt
+# between 0.0.6b45 and 0.2.2, so branch HEAD stopped providing the module
+# run.sh imports, and any rebuild produced a container that died on startup.
+#
+# The version below is kept in step with cync-lan/upstream by the subtree-sync
+# workflow, alongside config.yaml's. Installing from PyPI also removes the need
+# for git in the image at all.
 ARG BUILD_ARCH
 ARG BUILD_VERSION
 RUN set -x \
-    && apk add --no-cache --no-interactive \
-        git \
     && pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir "git+https://github.com/Proxy-alt/cync-lan@python" \
-    && apk del --no-interactive --purge \
-        git \
-    && rm -rf /var/cache/apk/*
+    && pip install --no-cache-dir "cync-lan-mqtt==0.2.2"
 
 ENV CYNC_HOST="0.0.0.0" \
     CYNC_DEBUG=0 \
