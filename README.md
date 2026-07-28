@@ -1,18 +1,30 @@
+<p align="center">
+  <picture>
+    <!-- Black on transparent, so it is close to invisible on GitHub's dark
+         theme without this. Absolute URLs because the brand assets live on
+         the feature/ha-custom-component branch, not this one. -->
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="https://raw.githubusercontent.com/Proxy-alt/cync-lan/feature/ha-custom-component/custom_components/cync_lan/brand/dark_logo@2x.png">
+    <img
+      src="https://raw.githubusercontent.com/Proxy-alt/cync-lan/feature/ha-custom-component/custom_components/cync_lan/brand/logo@2x.png"
+      alt="Cync LAN"
+      width="420">
+  </picture>
+</p>
+
 >[!IMPORTANT]
-> [DNS redirection REQUIRED](./docs/DNS.md)
+> [DNS redirection REQUIRED](https://github.com/Proxy-alt/cync-lan/wiki/DNS)
 
-# THERE IS NOW A HASS *App* FOR THIS PROJECT!
+>[!NOTE]
+> This branch's package is now `cync-lan-mqtt` on PyPI (`pip install
+> cync-lan-mqtt`), depending on the `cync-lan` core protocol library rather
+> than bundling it - see the `core` branch. The `cync-lan` console script
+> name and every environment variable are unchanged; only the underlying
+> package/import names split (`cync_lan_mqtt` for this add-on's own
+> `main.py`/`mqtt_client.py`/`exporter.py`, `cync_lan` for everything else).
 
-Huge thanks to [@CodeNeedsCoffee](https://github.com/CodeNeedsCoffee) for the initial work on the App!
-
-[![Open your Home Assistant instance and show the add App repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbaudneo%2Fhass-addons)
-
-The existing `python` branch will remain for users who prefer a non HASS App setup. However, docker is required and 
-manual installation is no longer officially supported. The HASS app uses the `python` branch to build its image.
-
->[!WARNING]
-> **DO NOT** contact GE / Savant for troubleshooting while using this project, open issues here and tag @baudneo 
-> for fast responses.
+# cync-lan-mqtt
 
 Async HTTP/MQTT LAN controller for Cync/C by GE devices. **Local** only control
 of **most** Cync devices via MQTT JSON payloads following the Home Assistant MQTT JSON schema. 
@@ -29,10 +41,117 @@ Forked from [cync-lan](https://github.com/iburistu/cync-lan) and
 [iburistu](https://github.com/iburistu) and 
 [juanboro](https://github.com/juanboro)
 
+## There is a Home Assistant App for this project
+
+Huge thanks to [@CodeNeedsCoffee](https://github.com/CodeNeedsCoffee) for the initial work on the App!
+
+[![Open your Home Assistant instance and show the add App repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FProxy-alt%2Fhass-addons)
+
+The existing `python` branch will remain for users who prefer a non HASS App setup. However, docker is required and 
+manual installation is no longer officially supported. The HASS app uses the `python` branch to build its image.
+
+>[!WARNING]
+> **DO NOT** contact GE / Savant for troubleshooting while using this project. Open an issue
+> [here](https://github.com/Proxy-alt/cync-lan/issues) - this is a fork, so please don't send
+> its bugs upstream to @baudneo.
+
+
+
 >[!WARNING]
 > It is **HIGHLY** recommended that you do **NOT** do any firmware upgrades to Cync devices after running cync-lan. 
 > It is extremely (change 1 param in a constructor or config) easy for Savant to disable this method of local control.
 > While new methods may restore functionality, I'd rather not go down that route.
+
+## About this fork
+
+This repository is itself a more recent fork, of [baudneo/cync-lan](https://github.com/baudneo/cync-lan)
+(all of the above credit still applies - baudneo did the substantial rewrite
+that this fork continues from). Upstream stopped receiving updates at
+`0.0.6b16`; everything from `0.0.6b17` onward - see [CHANGELOG.md](./CHANGELOG.md)
+for the full list - exists only here, including:
+
+- Real motion-sensor support: the standalone motion-sensor accessory and the
+  battery-powered "Wireless Switch" both now show up as `occupancy`
+  binary_sensors, and switch/light models with a built-in motion/ambient
+  sensor get a second entity for it.
+- 54 previously-unrecognized device types added, plus corrected
+  classification (light vs switch, dimmable vs not) for several existing
+  wired-switch types that were wrong.
+- A handful of real data-loss/crash bugs found via a new "Unsupported Device
+  Debug Capture" tool: silently-dropped device status updates on certain
+  packet variants, a TCP framing bug that discarded an entire read on a
+  single misaligned byte, and a crash that could permanently kill MQTT.
+- Fixed brightness state going stale on Sol-lamp devices, and a wrong
+  effect ID that likely made the "fireworks" light-show effect silently
+  fail.
+- The protocol code was split out into a reusable
+  [`cync-lan`](https://pypi.org/project/cync-lan/) library (the
+  [`core`](https://github.com/Proxy-alt/cync-lan/tree/core) branch), so the
+  add-on, the HA integration and anything else can share one implementation
+  instead of vendoring copies that drift.
+- Substantially expanded protocol documentation in
+  [`docs/mesh_opcodes.md`](docs/mesh_opcodes.md), reverse-engineered from
+  the decompiled Android app, with explicit confidence markers - most
+  opcodes are **not** hardware-confirmed, and
+  [`docs/hardware_verification.md`](docs/hardware_verification.md) tracks
+  what still needs testing.
+- Test suites and CI where there previously were none at all: this package
+  had 2,456 lines, including a 1,900-line MQTT client, with nothing
+  verifying any of it.
+
+**A native Home Assistant integration also now exists** - not an add-on or
+MQTT bridge, but a real `custom_component` you install through HACS, on the
+`feature/ha-custom-component` branch. It doesn't exist upstream at all. See
+[Choosing how to run this](#choosing-how-to-run-this) below, and
+[`custom_components/cync_lan/README.md`](https://github.com/Proxy-alt/cync-lan/blob/feature/ha-custom-component/custom_components/cync_lan/README.md)/
+[`custom_components/cync_lan/CHANGELOG.md`](https://github.com/Proxy-alt/cync-lan/blob/feature/ha-custom-component/custom_components/cync_lan/CHANGELOG.md)
+for what it does specifically (light groups, Scenes/Schedules as real
+entities, indicator-LED control, and pushing an existing HA automation onto
+the Cync hub as a native schedule, among others) - it's versioned and
+released separately from the Python package described in the rest of this
+README.
+
+## Repository layout
+
+Three separately-versioned, separately-released artifacts share this one
+repository, each on its own branch. **You are on `python`.**
+
+| Artifact | Branch | What it is | Distributed via |
+|---|---|---|---|
+| `cync-lan` | [`core`](https://github.com/Proxy-alt/cync-lan/tree/core) | Core protocol library - sessions, packet codec, cloud auth, BLE | [PyPI](https://pypi.org/project/cync-lan/) |
+| `cync-lan-mqtt` | **`python`** (here) | This: standalone Docker/MQTT daemon + HTTP device exporter | [PyPI](https://pypi.org/project/cync-lan-mqtt/) + [ghcr.io](https://github.com/Proxy-alt/cync-lan/pkgs/container/cync-lan-mqtt) image |
+| `cync_lan` custom_component | [`feature/ha-custom-component`](https://github.com/Proxy-alt/cync-lan/tree/feature/ha-custom-component) | Native Home Assistant integration (no MQTT) | GitHub Release / HACS |
+
+The three are versioned independently - bumping the core library does not
+require bumping this add-on, or vice versa. [RELEASING.md](./RELEASING.md)
+covers the details, including the rule that decides releases from
+prereleases: a plain `X.Y.Z` version cuts a full release, `X.Y.ZbN` cuts a
+prerelease, and anything else fails the build.
+
+`docs/` is mirrored byte-for-byte across all three branches (canonical copy
+on `core`), so any `docs/` link here resolves on any branch.
+
+## Choosing how to run this
+
+There are three different ways to get Cync devices talking to Home
+Assistant through this project now, all requiring the same
+[DNS redirection](https://github.com/Proxy-alt/cync-lan/wiki/DNS) but otherwise fairly different in setup:
+
+| | Docker Compose (this README) | Home Assistant "App" ([hass-addons](https://github.com/Proxy-alt/hass-addons)) | HACS custom_component (`feature/ha-custom-component`) |
+|---|---|---|---|
+| Requires Docker | Yes, you run it | Yes, but HA Supervisor manages it | No |
+| Requires an MQTT broker | Yes | Yes (HA's own Mosquitto add-on works) | No |
+| Configuration | Environment variables / `docker-compose.yaml` | HA Supervisor's Options UI (`config.yaml` schema) | HA's own config flow (email/password + emailed code) - no YAML |
+| Devices exposed as | MQTT-discovered entities | MQTT-discovered entities | Native HA entities (no MQTT involved) |
+| Cloud-token encryption key | You set `CYNC_SECRET_KEY` yourself | You set the `secret_key` option yourself | Derived and set automatically - nothing to configure |
+| Install method | `docker compose up` | Add the [hass-addons](https://github.com/Proxy-alt/hass-addons) repository, install the "CyncLAN Bridge" App | Add this repository to HACS as a custom repository (see below) |
+
+If you're not sure which one you want: the HACS `custom_component` is the
+newest and least Docker-dependent option, and it installs through HACS like
+any other custom repository. If you'd rather stick with the well-established
+Docker/MQTT path, the "App" is the least manual-setup version of that (no
+docker-compose.yaml to write yourself), while this README's plain Docker
+Compose instructions give you the most direct control.
 
 ## Prerequisites
 - Docker
@@ -41,7 +160,7 @@ Forked from [cync-lan](https://github.com/iburistu/cync-lan) and
 - MQTT broker (I recommend EMQX)
 - Export devices from the Cync cloud to a YAML file; first export requires account email, password and an OTP emailed to you
   - After configuring and running the container, navigate to http://127.0.0.1:23778 to export devices from the cloud 
-- [DNS override/redirection](./docs/DNS.md) for `cm.gelighting.com`, `cm-sec.gelighting.com` or `cm-ge.xlink.cn` to a local host that will run `cync-lan`
+- [DNS override/redirection](https://github.com/Proxy-alt/cync-lan/wiki/DNS) for `cm.gelighting.com`, `cm-sec.gelighting.com` or `cm-ge.xlink.cn` to a local host that will run `cync-lan`
 - **Optional:** *[Firewall](#firewall) / routing rules to allow cync devices to talk to `cync-lan`* **(VLANs?)**
 
 >[!NOTE]
@@ -51,7 +170,18 @@ Forked from [cync-lan](https://github.com/iburistu/cync-lan) and
 
 ## Installation
 
-See the [installation](./docs/install.md) docs for more information
+See the [installation](https://github.com/Proxy-alt/cync-lan/wiki/Installation) docs for more information.
+
+Multi-arch images (`linux/amd64`, `linux/arm64`) are published to GitHub
+Packages on every release:
+
+```bash
+docker pull ghcr.io/proxy-alt/cync-lan-mqtt:latest
+```
+
+`latest` only ever moves to a full release, never to a `bN` beta - pin a
+version (`:0.2.1`) to upgrade deliberately. 32-bit ARM (`linux/arm/v7`) is
+not published; see [docs/install.md](https://github.com/Proxy-alt/cync-lan/wiki/Installation) for why.
 
 >[!IMPORTANT]
 > After configuring and running the container (but before enabling DNS redirection), you must visit http://localhost:23778 in order to export your Cync 
@@ -65,7 +195,7 @@ See the [installation](./docs/install.md) docs for more information
 > a DNS request and connect to the local `cync-lan` server.
 
 There are detailed instructions for OPNSense (unbound / dnscrypt-proxy), Pi-hole, Ad-Guard Home and TP-Link Omada SDN. 
-See [DNS docs](docs/DNS.md) for more information.
+See [DNS docs](https://github.com/Proxy-alt/cync-lan/wiki/DNS) for more information.
 
 ---
 
@@ -128,7 +258,7 @@ The log files are rotated at local midnight and are not deleted by the app at an
 ---
 
 ## Tips
-See [Tips](docs/tips.md) for more information on how to get the most out of this project.
+See [Tips](https://github.com/Proxy-alt/cync-lan/wiki/Tips) for more information on how to get the most out of this project.
 
 ## Cync Group/Room support
 Currently, the only way to interact with cync groups is to target a physical mains powered light switch that is a part of the Cync group/room with the on/off, kelvin or RGB command.
@@ -162,6 +292,7 @@ For the `yes` / `no` value, the user input is cast to a lower case string stripp
 | `CYNC_ENABLE_EXPORTER`       | Start the local device export web app                                                                          | `yes`                                 | str  |
 | `CYNC_ACCOUNT_USERNAME`      | Cync account username (email) *Required* for the export web app                                                |                                       | str  |
 | `CYNC_ACCOUNT_PASSWORD`      | Cync account password *Required* for the export web app                                                        |                                       | str  |
+| `CYNC_SECRET_KEY`            | *Required.* Random alphanumeric string used to encrypt the cached cloud auth token at rest (Fernet/PBKDF2HMAC). Pick your own value and keep it stable - changing it invalidates the cache and forces a re-login. | | str |
 | `CYNC_OVERWRITE_CONFIG_FILE` | On export, overwrite `cync_mesh.yaml` or use a numbered system: `*_1.yaml`, `*_2.yaml`, etc.                   | `yes`                                 | str  |
 | `CYNC_MQTT_HOST`             | Host of MQTT broker                                                                                            | `homeassistant.local`                 | str  |
 | `CYNC_MQTT_PORT`             | Port of MQTT broker                                                                                            | `1883`                                | int  |
@@ -174,6 +305,9 @@ For the `yes` / `no` value, the user input is cast to a lower case string stripp
 | `CYNC_RAW_DEBUG`             | Enable raw binary message debug logging (non-MITM, so strictly between dev and CyncLAN)                        | `no`                                  | str  |
 | `CYNC_MITM_DEV_LOGGER`       | Enable MITM console logging for Cync Devices (enabling this will also output to the console)                   | `no`                                  | str  |
 | `CYNC_MITM_APP_LOGGER`       | Enable MITM console logging for mobile APPS (enabling this will also output to the console)                    | `no`                                  | str  |
+| `CYNC_MITM_ENTITIES`         | Show a per-device "MITM Mode" switch entity in HASS. Off by default since 0.0.6b22 - MITM mode itself still works via the button/service either way, this only controls whether a dedicated entity clutters your dashboard | `no` | str |
+| `CYNC_UNSUPPORTED_RAW_DEBUG` | Log raw packets from never-seen or unsupported device types to a dedicated `unsupported_devices.log`, independent of `CYNC_RAW_DEBUG` - safe to leave on for an extended capture, useful when reporting a new device type | `no` | str |
+| `CYNC_EXPERIMENTAL_LOG_PATH` | Override where every `experimental_*` command/service invocation gets recorded - always-on, no flag needed. Attach `experimental_features.log` (default location alongside your other cync-lan files) when reporting a bug about any experimental feature | `{CYNC_CONFIG_DIR}/experimental_features.log` | str |
 | `CYNC_DEVICE_CERT`           | Path to cert file                                                                                              | `certs/server.pem`                    | str  |
 | `CYNC_DEVICE_KEY`            | Path to key file                                                                                               | `certs/server.key`                    | str  |
 | `CYNC_SRV_HOST`              | Interface to listen on                                                                                         | `0.0.0.0`                             | str  |
@@ -232,21 +366,65 @@ In `dump.txt` you will see the back-and-forth communication between the device a
   - allows for only redirecting the device and mobile app to different machines hosting `socat`; see what the mobile app sends and then what the cloud sends to the device
   - the goal is to only have 1 device talking to 1 `socat` instance, so you can easily correlate the logs to the device and not have to sift through a ton of noise from other devices
 
-# Firewall
+## Firewall
 Once the devices are local, they must be able to initiate a connection to 
 the `cync-lan` server. If you block them from the internet, don't forget to 
 allow them to connect to the `cync-lan` server (VLANs?).
 
 ## OPNsense Example
-Please see the [example](./docs/troubleshooting.md#opnsense-firewall-example)
+Please see the [example](https://github.com/Proxy-alt/cync-lan/wiki/Troubleshooting#opnsense-firewall-example)
 in the troubleshooting docs.
 
-# Power cycle devices after DNS re-route
+## Power cycle devices after DNS re-route
 Devices make a DNS query on first startup (or after a network loss,
 like AP reboot) - you need to power cycle all devices that are currently 
 connected to the Cync cloud servers before they request a new DNS record 
 and will connect to the local `cync-lan` server.
 
-# Troubleshooting
+## Experimental: BLE provisioning of brand-new devices
+`cync-lan-ble-provision` (install with `pip install cync_lan[ble]`) is an **EXPERIMENTAL, untested
+against real hardware** command-line tool for pairing a brand-new/factory-reset Cync device onto a
+mesh over BLE directly - unrelated to the TCP relay server above, and a different transport
+entirely. See [docs/ble_provisioning_protocol.md](docs/ble_provisioning_protocol.md) for the full
+protocol research this implements. Usage:
+
+```bash
+cync-lan-ble-provision scan
+cync-lan-ble-provision provision <ble-address> <mesh-name> <mesh-password>
+```
+
+Please report success or failure (with the exact error/traceback either way) if you try this
+against real hardware.
+
+## Troubleshooting
 If you are having issues, please see the 
-[Troubleshooting docs](docs/troubleshooting.md) for more information.
+[Troubleshooting docs](https://github.com/Proxy-alt/cync-lan/wiki/Troubleshooting) for more information.
+
+## Credits
+
+This project is the current link in a chain of earlier work, and none of it
+would exist without the people below.
+
+- **[iburistu](https://github.com/iburistu)** -
+  [cync-lan](https://github.com/iburistu/cync-lan), the original. The first
+  public demonstration that Cync devices could be controlled locally by
+  impersonating the cloud server. MIT, © 2022 Zachary Linkletter.
+- **[juanboro](https://github.com/juanboro)** -
+  [cync2mqtt](https://github.com/juanboro/cync2mqtt), the original MQTT
+  bridge and cloud-export approach that this add-on's whole shape descends
+  from. Apache-2.0. Little of that code survives verbatim at this point, but
+  the attribution stays. Long live OSS.
+- **[baudneo](https://github.com/baudneo)** -
+  [baudneo/cync-lan](https://github.com/baudneo/cync-lan), the substantial
+  async rewrite this fork continues from, and the origin of most of the
+  protocol knowledge here. Upstream stopped at `0.0.6b16`; everything from
+  `0.0.6b17` onward exists only in this fork.
+- **[@CodeNeedsCoffee](https://github.com/CodeNeedsCoffee)** - initial work
+  on the Home Assistant App.
+
+Full license texts for all of the above are reproduced in
+[LICENSE-3RD-PARTY](./LICENSE-3RD-PARTY).
+
+## License
+
+MIT, same as the original - see [LICENSE](./LICENSE).
