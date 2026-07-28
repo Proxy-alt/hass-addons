@@ -9,3 +9,12 @@ docker-compose.yaml
 uv.lock
 dump.txt
 *.egg-info
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# Built by the web/ Vite app. Not committed: the Docker build produces it from
+# source, so a checked-in copy could only ever be stale.
+/web/node_modules/
+/web/dist/

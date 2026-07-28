@@ -1,3 +1,116 @@
+### 0.2.2
+
+Packaging metadata only - no code change.
+
+Adds the `keywords` and the `Topic ::` / `Framework ::` / `Development Status`
+classifiers that PyPI weights in its own search ranking. `cync-lan-mqtt` previously
+declared none of them, so it was effectively unfindable on PyPI except by
+exact name.
+
+### 0.2.1
+
+Requires `cync-lan` 0.2.1, which relaxes its exact `pyyaml==6.0.2` pin - that
+pin made the core package uninstallable alongside Home Assistant, which
+requires `PyYAML==6.0.3`. This package carried the identical exact pin, so it
+is relaxed here too; nothing in it needs a specific PyYAML version.
+
+### 0.2.0
+
+**Requires `cync-lan` 0.2.0, and Python 3.12+.** The previous `>=3.9` claim was
+never true for this dependency chain - the core library needs 3.12 - so an
+install on an older interpreter resolved and then failed on import.
+
+Picking up core 0.2.0 also fixes six hub commands (create/delete scene,
+create/delete schedule, add/toggle automation) that sent a length field one
+byte short, which made device firmware read a truncated body and the command
+silently do nothing. See the core changelog for detail.
+
+**Fixed: fan speed updates reported success when every publish had failed.**
+`update_fan_speed` gathers its two publishes with `return_exceptions=True`, so
+a failure comes back as a result object rather than raising - and result
+objects are truthy, so `all(results)` was `True` even when nothing reached the
+broker. It now checks for exceptions explicitly. The same method's error
+handler also referenced an undefined name, so a publish failure raised
+`NameError` instead of being logged.
+
+**Fixed: Home Assistant discovery froze for ~3 seconds per motion sensor.**
+Seeding a motion sensor's retained state opened its own blocking broker
+connection and spun a synchronous wait loop, inline on the event loop. With
+several sensors that stalled all other traffic for the duration. Moved to an
+executor.
+
+**Fixed: `import cync_lan_mqtt.exporter` raised `RuntimeError` outside Docker.**
+The web UI's static assets were mounted at import time against a path that
+only exists inside the add-on image. The mount is now skipped with a warning
+when the directory is absent - which is also why this package had no tests
+before now.
+
+**Fixed:** the two "Cync app active" markers were near-identical copies with
+separate timer handles; they now share one implementation keyed by flag name,
+so a fix cannot land in one and miss the other. `get_startup_topic_state_sync`
+was annotated `-> getattr` (the builtin function) and is now `Optional[str]`.
+Unhandled MQTT messages are logged rather than silently dropped.
+
+Housekeeping: this package now has a test suite and CI at all - 13 tests
+covering fan-speed updates, the app-activity markers, the executor offload and
+singleton behaviour, running on 3.12 and 3.14. ruff runs in CI too; it was
+configured but had never been run (124 violations).
+
+### 0.1.1
+
+- No functional change - verifies the CI publish workflow's PyPI Trusted
+  Publishing step end-to-end now that the `cync-lan-mqtt` project exists
+  on PyPI (0.1.0 was published manually after the pending publisher wasn't
+  yet recognized on the first automated attempt).
+
+### 0.1.0
+
+- Renamed from `cync-lan` (version scheme `0.0.6bNN`) to `cync-lan-mqtt`,
+  and reset to a clean `0.1.0` - the protocol/device layer (`devices.py`,
+  `server.py`, `cloud_api.py`, `packet/`, `metadata/`, `ble_provision.py`,
+  most of `const.py`/`structs.py`/`utils.py`) moved out to a new, separately
+  published `cync-lan` core package (see its own `CHANGELOG.md` on the
+  `core` branch) instead of living in this same package. This package now
+  contains only the standalone daemon (`main.py`), MQTT/HASS-discovery
+  bridge (`mqtt_client.py`), and HTTP device-list exporter (`exporter.py`),
+  and depends on `cync-lan` from PyPI. The `cync-lan` console script name,
+  every environment variable, and all runtime behavior are unchanged - this
+  is a packaging change, not a functional one. Earlier history below this
+  entry describes the same codebase before the split.
+
+### 0.0.6b48
+- Add `CyncDevice.relay_source` tracking: whichever TCP-connected device most recently relayed a
+  status update for a given device, set at every mesh status/MeshInfo parse site. The only presence
+  signal available for a BTLE-mesh-only device, which never owns a direct TCP connection of its
+  own - not yet exposed as an MQTT topic here, but backs the HA custom_component's new "Connected
+  via" diagnostic sensor (see its own `CHANGELOG.md`).
+
+### 0.0.6b47
+- Fix devices going unavailable when they lose power or network not being detected - `close()`
+  tore down a TCP session's socket resources but never marked the device that owned it offline,
+  even in the exact case the code already detected and logged ("device probably dropped the
+  connection (lost power)"). A device that simply stopped appearing in any mesh status broadcast
+  (rather than appearing WITH a "not recently seen" flag - the only case the existing offline
+  detection covered) stayed marked online/available indefinitely, showing stale last-known state.
+  Now `close()` marks that session's own device offline immediately whenever it ends, covering
+  lost power, network drops, and deliberate reconnect cycles (MITM mode toggling briefly flips
+  availability too - correct, not a regression, since that's a real disconnect/reconnect).
+
+### 0.0.6b46
+- Add `cync-lan-ble-provision`, an EXPERIMENTAL, untested-against-real-hardware CLI for pairing a
+  brand-new/factory-reset device onto a mesh directly over BLE (a separate transport entirely from
+  this project's usual TCP relay). Implements the full confirmed pairing/session-key/mesh-credential
+  handoff flow, including the exact fixed bootstrap bytes the real Cync app uses for a never-
+  provisioned device - independently reproduced from the documented formula, matching the
+  decompiled app's own hardcoded constant exactly. See `docs/ble_provisioning_protocol.md`. Install
+  with `pip install cync_lan[ble]`; does not touch the main server or require `bleak` otherwise.
+- Fixed, before this saw real use: the pairing-confirmation check accepted any nonzero response
+  byte as success; the real app's own callback (confirmed via direct source read) only treats the
+  literal byte value `7` as confirmed - anything else, including plausible-looking nonzero values,
+  means the device rejected the new mesh credentials. Also added `verify_pairing_response()`, a
+  non-fatal diagnostic replicating a real mutual-auth check the app performs that this module had
+  incorrectly assumed (based only on an unrelated open-source client) wasn't done at all.
+
 ### 0.0.6b45
 - Fix sol-lamp brightness changes not updating in HA immediately: the ack-matching allow-list was missing the `0xD2` op sol-lamp devices use for brightness, so their acks went unrecognized and HA's brightness slider stayed stale until an unrelated status update happened to correct it. Confirmed against the real Cync Android app's decompiled command encoding
 - Fix the "fireworks" light-show effect sending the wrong effect ID (`0x3A`/58, not valid anywhere in the real app's effect scheme) instead of the correct ID (`3`) - likely silently rejected by real hardware before this fix

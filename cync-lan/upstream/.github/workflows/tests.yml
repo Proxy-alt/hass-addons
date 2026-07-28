@@ -1,0 +1,67 @@
+name: Tests
+
+# This package had no test suite and no test CI at all - 2,456 lines,
+# including a 1,900-line MQTT client, with nothing verifying any of it.
+
+on:
+  push:
+    branches:
+      - python
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: pytest (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the real floor: this depends on cync-lan, whose devices.py
+        # uses a PEP 701 nested-quote f-string (3.12+) on top of enum.StrEnum
+        # and datetime.UTC (3.11+).
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]" pytest pytest-asyncio
+      - run: pytest tests/ -q
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install ruff
+      - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
+
+  docs-in-sync:
+    name: docs match the canonical copy on core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      # docs/ is mirrored on core, python and feature/ha-custom-component
+      # because each is a separately published artifact. core is canonical.
+      # mesh_opcodes.md had already drifted 9 lines between branches before
+      # this check existed, so nothing catches it but CI.
+      - name: Compare docs/ against origin/core
+        run: |
+          git fetch --no-tags --depth=1 origin core
+          if ! git diff --quiet FETCH_HEAD -- docs/; then
+            echo "docs/ differs from the canonical copy on the core branch:"
+            git --no-pager diff --stat FETCH_HEAD -- docs/
+            echo
+            echo "Copy the updated files from core, or update core first."
+            exit 1
+          fi
+          echo "docs/ is in sync with core"
