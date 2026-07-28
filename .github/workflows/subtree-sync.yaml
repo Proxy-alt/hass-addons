@@ -8,6 +8,17 @@ name: Sync cync-lan subtree
 # pushing directly to dev, so a human still reviews what changed before it
 # lands (and so the Builder workflow's normal push-triggered build isn't
 # bypassed).
+#
+# NOTE: creating that pull request requires "Allow GitHub Actions to create
+# and approve pull requests" (Settings -> Actions -> General -> Workflow
+# permissions). Without it the subtree pull and the branch push both succeed
+# and only the final step fails, with
+#
+#     GitHub Actions is not permitted to create or approve pull requests
+#
+# which leaves the synced work stranded on the subtree-sync/cync-lan branch
+# with nothing pointing at it. That is precisely how the run of 2026-07-27
+# failed, and why the add-on stayed on 0.0.6b45 while upstream reached 0.2.2.
 
 on:
   schedule:
@@ -23,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -46,8 +57,46 @@ jobs:
             git commit -m "Sync cync-lan/CHANGELOG.md from upstream"
           fi
 
+      # Home Assistant decides whether to offer users an update by comparing
+      # this version field and nothing else. Syncing the code without bumping
+      # it means a rebuilt add-on ships new code that no existing install is
+      # ever prompted to take - which is exactly what happened here: the
+      # subtree reached 0.2.2 while config.yaml sat at 0.0.6b45.
+      - name: Bump the add-on version to match upstream
+        run: |
+          python3 - <<'PY'
+          import re, sys, tomllib
+
+          with open("cync-lan/upstream/pyproject.toml", "rb") as fh:
+              version = tomllib.load(fh)["project"]["version"]
+
+          path = "cync-lan/config.yaml"
+          src = open(path).read()
+
+          # A targeted line rewrite, not a YAML round-trip: parsing and
+          # re-dumping this file would silently discard its comments and
+          # reorder its keys.
+          new, count = re.subn(
+              r'^(version:[ \t]*)"[^"]*"', rf'\g<1>"{version}"', src,
+              count=1, flags=re.M,
+          )
+          if count != 1:
+              sys.exit(f"expected exactly one version: line in {path}, found {count}")
+
+          if new != src:
+              open(path, "w").write(new)
+              print(f"bumped to {version}")
+          else:
+              print(f"already at {version}")
+          PY
+
+          if ! git diff --quiet cync-lan/config.yaml; then
+            git add cync-lan/config.yaml
+            git commit -m "Bump add-on version to match upstream"
+          fi
+
       - name: Open a pull request with anything that changed
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: subtree-sync/cync-lan
@@ -57,7 +106,12 @@ jobs:
           body: |
             Automated pull from [Proxy-alt/cync-lan](https://github.com/Proxy-alt/cync-lan)'s
             `python` branch (`cync-lan/upstream/`), with `cync-lan/CHANGELOG.md`
-            re-synced from it if it changed.
+            and the `version:` in `cync-lan/config.yaml` re-synced from it if
+            they changed.
+
+            **Check the version bump before merging.** It is what Home
+            Assistant uses to offer the update to existing installs, so
+            merging this is what makes the synced code actually reach anyone.
 
             `cync-lan/README.md`'s own device-support summary is **not**
             auto-updated by this workflow (its structure/audience differs

@@ -4,18 +4,27 @@ FROM $BUILD_FROM
 ENV PYTHONUNBUFFERED=1
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+# NO build-time certificate generation, deliberately - and so no openssl.
+#
+# This used to run `openssl req -x509 ...`, baking one key pair into the built
+# add-on image so that every install shared a single private key, extractable
+# by anyone who pulls it.
+#
+# It was also redundant. cync_lan.server._ensure_self_signed_cert generates the
+# pair at startup whenever either file is missing, with identical parameters
+# (RSA 4096, CN=*.xlink.cn, self-signed, 3650 days). Creating the files here is
+# exactly what stopped it running - it returns early when both already exist.
+# run.sh starts the app through that same library, so removing this means each
+# install mints its own key on first start.
+#
+# openssl goes with it: the CLI was here only for the line above.
 ARG BUILD_ARCH
 ARG BUILD_VERSION
 RUN set -x \
     && apk add --no-cache --no-interactive \
-        openssl \
         nano \
         tree \
     && pip install --no-cache-dir -U pip \
-    && mkdir -p /root/cync-lan/certs \
-    && openssl req -x509 -newkey rsa:4096 \
-        -keyout '/root/cync-lan/certs/key.pem' -out '/root/cync-lan/certs/cert.pem' \
-        -subj '/CN=*.xlink.cn' -sha256 -days 3650 -nodes \
     && rm -rf /var/cache/apk/*
 
 ARG BUILD_ARCH

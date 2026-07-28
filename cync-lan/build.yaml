@@ -6,7 +6,12 @@ build_from:
 labels:
   org.opencontainers.image.title: "CyncLAN Bridge - Home Assistant App"
   org.opencontainers.image.description: "Local MQTT controller for Cync/C by GE smart devices (DNS redirection required)"
-  org.opencontainers.image.source: "https://github.com/baudneo/hass-addons"
+  # image.source is what attaches a published package to a repository in the
+  # GitHub Packages UI. This pointed at baudneo/hass-addons - the upstream this
+  # was forked from - so the built add-on image was being filed under somebody
+  # else's repo. Same bug, same fix as the one already corrected in the
+  # cync-lan repository's own docker/Dockerfile.
+  org.opencontainers.image.source: "https://github.com/Proxy-alt/hass-addons"
   org.opencontainers.image.licenses: "MIT"
 #args:
 #  TEMPIO_VERSION: "2021.09.0"
