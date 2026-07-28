@@ -13,9 +13,30 @@ Sourcing conventions used throughout this doc, matching the existing standard se
 - **plausible** — a reasonable inference from decompiled evidence, not directly proven.
 - **not found / blocked** — explicitly flagged as absent, not guessed at.
 
-Research credited to background agents run 2026-07-16 against
-`/Users/proxy-alt/Downloads/cync_decompiled/`, cross-referenced with this repo's own
-`src/cync_lan/devices.py`.
+
+> **This file is mirrored on three branches** (`core`, `python`,
+> `feature/ha-custom-component`), because each is a separately published
+> artifact with its own repo view. `core` is canonical. Edit it there and
+> copy to the others in the same change - CI fails the build if they drift
+> (see `.github/workflows/tests.yml`'s `docs-in-sync` job).
+
+### Source trees
+
+Two different decompiles are cited across this repo's docs, and they are not interchangeable:
+
+- **v1** — `cync_decompiled/`. The original jadx run. Everything in this doc dated 2026-07-16
+  (background agents, cross-referenced against this repo's own `src/cync_lan/devices.py`) is
+  against v1.
+- **v2** — `cync_decompiled_v2/`. A re-decompile with anti-inlining flags, which recovers method
+  bodies v1 had inlined away. `ble_provisioning_protocol.md` and the "Hub command family"
+  section below are against v2. v2 also carries ~60 files of inline
+  `[cync-lan reverse-engineering note ...]` comments recording earlier analysis.
+
+Cite class paths relative to a tree's `sources/` root — e.g.
+`sources/com/gelighting/cbygekit/services/devices/command/AddAutomationHubCommand.java` — rather
+than by absolute local path, and say which tree. Neither tree is in version control, so a claim
+that cannot be re-derived from a class path is a claim that will not survive losing the folder.
+Line numbers in older sections refer to v1 and will not match v2; the class and field names do.
 
 ## The `cmd_code` mystery — resolved, see "TCP relay envelope research" below
 
@@ -206,10 +227,10 @@ and dropping the phantom repeated-op-byte cancel out exactly in the length formu
 LED: old `7+1+6B=0x0E` vs new `7+7B=0x0E`, same value). Only `op_code` (now `0x8E` for all three)
 and the payload's leading byte (now literally present as data - `0xF7` for indicator LED/motion
 settings, `0xEF` for scenes) changed. Fixed in `devices.py`'s `set_indicator_led()`,
-`set_motion_sensor_settings()`, and `execute_scene()`; **motion-sensor schedule write (`0x0B`,
-documented further below) was NOT yet updated** - it's still only documented, not wired into a
-real send, but almost certainly has the exact same bug (same `SetMotionSensorScheduleCommand`
-class, same `DefaultImpls.c`→`h()` path) and needs the identical correction whenever it's built.
+`set_motion_sensor_settings()`, and `execute_scene()`. **UPDATE**: motion-sensor schedule write
+(`0x0B`, documented further below) has since been wired in too - `set_motion_sensor_schedule()`
+has the identical correction applied (confirmed via the same `SetMotionSensorScheduleCommand`
+class, same `DefaultImpls.c`→`h()` path), same as its siblings above.
 
 ### Fine/fade brightness — `op_code = 0xE2`, sub-command `0x08`
 
@@ -274,10 +295,30 @@ documented here for completeness but not worth implementing as a second way to d
 **Custom MultiColor scheme creation** (uploading arbitrary per-segment RGB data, not just
 activating a saved one) is a **separate, unrelated opcode**: `SetMultiColorSegmentsCommand.java`,
 `{0xF7, 0x11, 0x02, 0x4E}` — payload is a gradient-mode toggle, segment count, or up to 2 segments
-per packet as `[position_or_255, R, G, B]`. Also `SetMultiColorSchemeDirectCommand.java` (xlink
-`0x89`, "entertainment"/live-streaming variant) and `SetMultiColorBitmapCommand.java` (unread,
-likely tile/matrix bitmap data for other product types). Out of scope for a `set_lightshow`
-extension — a materially bigger feature with its own data model.
+per packet as `[position_or_255, R, G, B]`.
+
+**SHIPPED, EXPERIMENTAL**: `devices.py`'s `CyncDevice.set_multicolor_gradient_mode()`/
+`set_multicolor_segment_count()`/`set_multicolor_segments()` implement these 3 confirmed wire
+primitives exactly (dispatched via the same non-hub `0x8E`-relay-bug family as add_to_scene/
+set_indicator_led/etc, per `SetMultiColorSegmentsCommand.mo14023N()`'s
+`XlinkCommandDelegate.DefaultImpls.c()` call - no product-family branch exists for this command at
+all, unlike add_to_scene/set_group_membership/remove_from_scene). Per-segment position and color
+are confirmed INDEPENDENTLY nullable (`MultiColorSegmentData.java`'s own two separately-`@Nullable`
+fields) - position defaults to the `0xFF` sentinel, color defaults to `0,0,0`, not tied together.
+Position's `1-120` range is a literal confirmed directly in `SegmentData`'s own bounds check, not
+inferred. What's **not** wired in, and not just a matter of exposing another primitive:
+this project does not orchestrate the multi-send SEQUENCE a real custom scheme needs (what order
+the app sends gradient-mode/count/segment-data in across possibly many chunked sends for >2
+segments, and any timing between them, isn't traced from the decompiled source) - callers
+must chunk/sequence themselves.
+
+Also `SetMultiColorSchemeDirectCommand.java` (xlink `0x89`, "entertainment"/live-streaming variant)
+and `SetMultiColorBitmapCommand.java` (tile/matrix bitmap data for other product types) remain
+**out of scope, not just untested** - both dispatch via methods (`m14393b`/`m14027t`) never traced
+anywhere else in this research, structurally distinct from every other confirmed command family in
+this file, and "entertainment"/live-streaming framing strongly implies a continuous low-latency
+protocol rather than a one-shot command - a materially bigger feature than exposing another
+primitive, unlike the 3 `SetMultiColorSegmentsCommand` primitives above.
 
 Related for a future scene-export feature: `AddDeviceSceneCommand.java` (`{-18,17,2}` =
 `0xEE 0x11 0x02`) documents the 6-byte per-device state block scenes store
@@ -303,6 +344,17 @@ created/edited, not at trigger time. Two payload shapes depending on device rout
   the raw pre-framed `e()` method (same dispatch class as the pure Hub Scenes/Schedules commands
   elsewhere in this doc) - a structurally different payload from the non-hub path above, not just
   a different op_code.
+
+**`RemoveDeviceSceneCommand`** (the counterpart - removing a device's captured state from a scene
+without deleting the scene) is simpler and, unlike `AddDeviceSceneCommand`, has **both** branches
+confirmed and shipped: opcode array `{0xEE,0x11,0x02,0x00}` (fixed trailing `0x00` - no actionType/
+mode/color/fade fields, since there's nothing to configure) + sceneId (1 byte) = 5 bytes.
+Non-hub-routed devices hit the same `0x8E`-relay substitution as `AddDeviceSceneCommand`'s non-hub
+path. Hub-routed devices (`is_sol_lamp`) turned out to route through the same trustworthy
+`mo14054f()` envelope already confirmed for `set_group_membership()`'s `is_sol_lamp` branch - a
+real op_code `0xEE`, not the manually-built `WriteBuffer`/`FrameCode` frame that blocks
+`AddDeviceSceneCommand`'s hub path. **Shipped**: `devices.py`'s
+`CyncDevice.remove_from_scene(scene_id, sub_id=)` implements both branches.
 
 **The fade byte** (`ScheduleFade.java:25-32`, 1-byte signed enum): `NO_FADE=-1(0xFF)`,
 `FADE_10_SECONDS=1`, `FADE_30_SECONDS=2`, `FADE_1_MINUTE=3`, `FADE_5_MINUTES=4`,
@@ -462,6 +514,15 @@ correction (see CORRECTION above) and **the user confirmed it works**. Both `op_
 `cync_lan.experimental_set_indicator_led` HA service (service name kept as-is - renaming would
 break any automation already built against it - but its description text now says "confirmed
 working" instead of "predicted, not confirmed").
+
+**UPDATE, later this session**: also exposed as 4 real HA config entities - `select.py`'s
+`CyncLanIndicatorLedModeSelect`/`CyncLanIndicatorLedColorSelect`, `number.py`'s
+`CyncLanIndicatorLedBrightness`, `switch.py`'s `CyncLanIndicatorLedWifiBlinkSwitch` - rather than
+only the raw service, following an audit of Home Assistant's own docs on when a service call should
+be a real entity instead (`assumed_state`/`EntityCategory.CONFIG` are HA's documented pattern for
+exactly this "can command, can't read back" situation). Both surfaces converge on one shared
+per-device cache in `bridge.py` (`IndicatorLedState`/`set_indicator_led_field`) so a service call
+and an entity write can never diverge. The service stays for backward compatibility.
 
 This confirmation is also indirect evidence *for* the sibling commands below (motion sensor
 settings, scenes): it proves the `0x8E` op, the `repeat_op_code=False` envelope shape, and the
@@ -623,6 +684,114 @@ app uses to resolve a cloud `deviceType` int). All 155 are already keys in
 static enum, not a gap). Camera types (240/241/242) are present and correctly marked
 `UNKNOWN`/`supported=False` — different transport, intentionally out of scope. No further work
 needed here unless a newer app build adds types.
+
+## Hub command family — 8 further confirmed op_codes, extracted but not wired in
+
+Found by sweeping every class in `com/gelighting/cbygekit/services/devices/command/` for a real
+dispatch byte rather than for the opcode arrays those classes also carry. None of these eight
+appear anywhere in this repo's docs or `src/` today.
+
+**These op_codes are real, and for a specific reason.** All eight dispatch through
+`XlinkTranslatorKt.m14449a(seq, (byte) op, writeBuffer)` — the same call shape as
+`add_automation`'s already-confirmed `0x95` (see `devices.py`'s `add_automation` docstring:
+"real op_code (byte)-107 = 0x95"). On this hub/xlink path the byte argument **is** the outer
+op_code. That is *not* the same as the `0x8E`-family trap in the CORRECTION section above, where
+a command class's own `{0xEF,0x11,0x02}` array is the leading bytes of a payload and the real
+outer op is hardcoded elsewhere. Every entry below was read from the dispatch call, not from an
+opcode array.
+
+`WriteBuffer` widths, from `services/devices/xlink/legacy/WriteBuffer.java`:
+`m14441a()` = 1 byte, `m14442b()` = raw byte array, `m14443c()` = **4-byte LE**,
+`m14444d()` = **2-byte LE**. Buffers are allocated zero-filled and the whole array is sent, so an
+under-filled buffer goes out with trailing zero padding — the allocation size is the wire size.
+
+| op_code | Command class | Request payload | Response |
+| --- | --- | --- | --- |
+| `0x32` | `DeleteGroupHubCommand` | 2 B — `groupAddress` (u16 LE) | none |
+| `0x46` | `QueryDeviceTimeCommand` | 64 B, all zero | `DeviceTimeNotification` |
+| `0x49` | `QueryHubFirmwareUpdatesCommand` | 32 B, all zero | `HubFirmwareUpdatesNotification` |
+| `0x4B` | `QueryHubInfoCommand` | 64 B, all zero | `HubInfoNotification` |
+| `0x4F` | `StartHubFirmwareUpdatesCommand` | 32 B — `0x00` + `{0x00,0x00}` or `{0xFF,0xFF}` | `HubFirmwareUpdateStatusNotification` |
+| `0x8A` | `QueryHubMeshNameAndPasswordCommand` | 64 B, all zero | `HubMeshNameAndPasswordNotification` |
+| `0x97` | `DeleteAutomationHubCommand` | 6 B — `scheduleId` (u16 LE) + 4 zero bytes | none |
+| `0xAD` | `QuerySolConfigCommand` | 64 B, all zero | `SolConfigNotification` |
+
+Confidence: **confirmed** for op_code and request payload (read from decompiled dispatch +
+`WriteBuffer` calls). **Not** hardware-tested — none of these is wired into `devices.py`, and the
+`cmd_code` for each would still need the length formula from "TCP relay envelope research" above.
+
+### Implementation status
+
+`0x32`, `0x46`, `0x4B`, `0x8A`, `0x97` and `0xAD` are wired into `devices.py`
+as of cync-lan 0.3.0.
+
+`0x49` `QueryHubFirmwareUpdates` is **deliberately not implemented**. Its
+reply is not a fixed record like the others: `HubFirmwareUpdatesNotification`
+reads a status byte and three 2-byte counters, then a variable-length list of
+per-device entries each carrying a 2-byte id and two 10-byte version strings.
+Getting the field order or the record stride wrong yields plausible-looking
+garbage rather than an obvious failure, and there is no capture to check a
+decoder against - so it stays documented rather than guessed at.
+
+The three firmware-*applying* commands (`0x4F` `StartHubFirmwareUpdates`,
+`StartWifiOtaUpdate`, `SetWifiOtaUpdateMode`) are **intentionally absent from
+the codebase entirely**, not merely unwired. Everywhere else in this family a
+wrong predicted `cmd_code` means the device ignores the packet; these flash
+firmware, where the same mistake has a much worse floor. They stay documented
+until someone confirms the envelope against a real packet capture.
+
+### The two write commands
+
+`0x97` `DeleteAutomationHubCommand` closes an obvious asymmetry: this repo already implements
+`create_schedule` (`0x92`), `toggle_automation` (`0x93`) and `delete_schedule` (`0x94`), but has
+no way to remove the *automation* (the trigger binding created by `add_automation`/`0x95`). The
+payload is a 6-byte buffer with only `m14444d(scheduleId)` written, so bytes 2-5 are zero — the
+same 6-byte frame shape as its siblings, not a 2-byte command.
+
+`0x32` `DeleteGroupHubCommand` takes a group `MeshAddress` as `UShort`, matching
+`MeshAddress.java`'s `GROUP_ADDRESS_RANGE = 32768 until 65535` already documented in
+"Groups control" above. It is the delete counterpart to the `0xD7` membership command.
+
+### Response layouts, decoded
+
+Read from each notification's `XlinkParser.mo14294a()`. All parse little-endian.
+
+**`0x8A` → `HubMeshNameAndPasswordNotification`** — two fixed 48-byte fields, 96 bytes total:
+
+```
+[0..47]   mesh name      (48 B, ASCII, NUL-padded)
+[48..95]  mesh password  (48 B, ASCII, NUL-padded)
+```
+
+This is the most directly useful of the eight. `src/cync_lan/ble_provision.py` currently requires
+`FACTORY_MESH_NAME`/`FACTORY_MESH_PASSWORD` because it can only provision a factory-default
+device; `key_encrypt()` and `generate_sk()` both derive from exactly these two values. A hub that
+answers `0x8A` would hand over an *already-provisioned* mesh's credentials over the LAN.
+
+**`0x4B` → `HubInfoNotification`** — four fixed 16-byte ASCII fields, 64 bytes total:
+
+```
+[0..15]   firmware version, major part
+[16..31]  firmware version, minor part   -> joined as "{major}.{minor}"
+[32..47]  MAC address     (parsed via MacAddress.Companion)
+[48..63]  setup code
+```
+
+**`0x46` → `DeviceTimeNotification`** (Xlink parser — 7 bytes read):
+
+```
+[0..1]  year   (u16 LE)
+[2]     month
+[3]     day
+[4]     hour
+[5]     minute
+[6]     second
+```
+
+Note the app also has a *Telink* parser for the same notification reading a different layout
+(offsets 10-19, adding a DST flag at byte 17 — `0xA1` true / `0xA0` false — and a packed
+`ZoneOffset` at 18-19). Only the Xlink layout above applies to this repo's TCP path; the Telink
+one is the BTLE-direct path and is noted here only so the two are not confused.
 
 ## Open threads for future research
 
