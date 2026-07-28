@@ -4,16 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CyncLAN - Device Export</title>
-  <link href="./static/css/main.min.css" rel="stylesheet">
-  <link href="./static/css/animate.min.css" rel="stylesheet">
-  <link href="./static/css/prism-tomorrow.min.css" rel="stylesheet">
+  <script type="module" crossorigin src="./static/index-DPJSKGMK.js"></script>
+  <link rel="stylesheet" crossorigin href="./static/index-McQqfa2B.css">
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-2xl animate__animated animate__fadeIn">
     <h1 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-6">CyncLAN - Device Export</h1>
 
     <div class="space-y-4">
-      <button id="startButton" onclick="startExport()" class="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 flex items-center justify-center">
+      <button id="startButton" class="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 flex items-center justify-center">
         <span id="startText">Start Export</span>
         <span class="ml-2 relative group focus:outline-none">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,11 +32,11 @@
       <div id="otpSection" class="space-y-2">
         <label for="otpInput" class="block text-sm font-medium text-gray-700 dark:text-gray-200">Enter OTP:</label>
         <input type="text" id="otpInput" placeholder="123456" class="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:text-gray-100" />
-        <button id="submitOtpButton" onclick="submitOTP()" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 flex items-center justify-center">
+        <button id="submitOtpButton" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 flex items-center justify-center">
           <span>Submit OTP</span>
         </button>
         <div id="restartDivider" class="hidden border-t border-gray-300 my-4"></div>
-        <button id="restartButton" onclick="restartServer()" class="hidden w-full bg-red-600 text-white p-2 rounded-md hover:bg-red-700 flex items-center justify-center">
+        <button id="restartButton" class="hidden w-full bg-red-600 text-white p-2 rounded-md hover:bg-red-700 flex items-center justify-center">
           <span id="restartText">Restart Server</span>
         </button>
       </div>
@@ -47,7 +46,7 @@
         <a id="downloadLink" href="#" download="cync_mesh.yaml" class="block bg-indigo-600 text-white text-center py-2 rounded hover:bg-indigo-700">Download Config File</a>
         <div class="relative">
           <pre id="yamlPreview" class="rounded bg-gray-900 text-white p-4 text-sm"><code class="language-yaml"></code></pre>
-          <button id="copyButton" onclick="copyConfig()" class="absolute top-2 right-2 bg-gray-700 text-white p-2 rounded-md hover:bg-gray-600 flex items-center">
+          <button id="copyButton" class="absolute top-2 right-2 bg-gray-700 text-white p-2 rounded-md hover:bg-gray-600 flex items-center">
             Copy
           </button>
         </div>
@@ -58,112 +57,5 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-
-  <script src="./static/js/prism.min.js"></script>
-  <script src="./static/js/prism-yaml.min.js"></script>
-  <script>
-    const BASE_PATH = window.location.pathname.replace(/\/[^\/]*$/, '');
-    const toast = document.getElementById('toast');
-
-    function showToast(msg) {
-      toast.textContent = msg;
-      toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 4000);
-    }
-
-    function showError(message) {
-      const err = document.getElementById('error');
-      err.textContent = message;
-      err.classList.remove('hidden');
-      setTimeout(() => err.classList.add('hidden'), 3000);
-    }
-
-    async function copyConfig() {
-      const yamlText = document.querySelector('#yamlPreview code').textContent.trim();
-      try {
-        await navigator.clipboard.writeText(yamlText);
-        showToast('Config copied to clipboard!');
-      } catch (e) {
-        showError('Copy failed: ' + e.message);
-      }
-    }
-
-    async function startExport() {
-      const btn = document.getElementById('startButton');
-      const spinner = document.getElementById('spinner');
-      btn.disabled = true;
-      spinner.classList.remove('hidden');
-
-      try {
-        const response = await fetch(`./api/export/start`);
-        const result = await response.json();
-        if (response.ok && result.success) {
-          await fetchAndShowConfig();
-        } else if (response.ok && result.message?.includes("OTP")) {
-          showToast(result.message);
-          document.getElementById('otpInput').focus();
-        } else {
-          showError(result.detail || 'Export failed.');
-        }
-      } catch (e) {
-        showError('Export error: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        spinner.classList.add('hidden');
-      }
-    }
-
-    async function submitOTP() {
-      const otp = document.getElementById('otpInput').value.trim();
-      if (!/^[0-9]{4,10}$/.test(otp)) return showError("OTP must be 4–10 digits");
-
-      try {
-        const response = await fetch(`./api/export/otp/submit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ otp: parseInt(otp, 10) })
-        });
-        const result = await response.json();
-        if (response.ok && result.success) {
-          document.getElementById('restartDivider').classList.remove('hidden');
-          document.getElementById('restartButton').classList.remove('hidden');
-          await fetchAndShowConfig();
-        } else {
-          showError(result.detail || 'OTP failed.');
-        }
-      } catch (e) {
-        showError('OTP submit error: ' + e.message);
-      }
-    }
-
-    async function restartServer() {
-      try {
-        const response = await fetch(`./api/restart`, { method: 'POST' });
-        if (response.ok) showToast('Server restart requested.');
-      } catch (e) {
-        showError('Restart error: ' + e.message);
-      }
-    }
-
-    async function fetchAndShowConfig() {
-      try {
-        const response = await fetch(`./api/export/download`);
-        const text = await response.text();
-        const code = document.querySelector('#yamlPreview code');
-        code.textContent = text;
-        Prism.highlightElement(code);
-        document.getElementById('downloadLink').href = `./api/export/download`;
-        document.getElementById('successSection').classList.remove('hidden');
-      } catch (e) {
-        showError("Failed to load config: " + e.message);
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('otpInput').addEventListener('keydown', e => {
-        if (e.key === 'Enter') submitOTP();
-      });
-    });
-  </script>
 </body>
 </html>
