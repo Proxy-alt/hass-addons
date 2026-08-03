@@ -120,6 +120,115 @@ Note the `cmd_code = 0x10` overlap across brightness/temperature/rgb despite thr
 `op_code`s — explained by the length-field formula in "TCP relay envelope research" above
 (all three share the same 8-byte payload length), not a semantic coincidence.
 
+### The leading `0x11, 0x02` is the Telink vendor ID — **confirmed**
+
+Every payload above opens with `0x11, 0x02`, and it is not a per-command constant to be
+copied around: it is the **Telink mesh vendor ID `0x0211`, little-endian**.
+
+Confirmed against [`juanboro/cync2mqtt`](https://github.com/juanboro/cync2mqtt)'s `acync`
+(Apache-2.0), an independently working BLE implementation descended from
+`google/python-dimond` and `python-tikteck`. It drives the same devices over Bluetooth
+instead of TCP, and constructs its packets like this:
+
+```python
+packet[7] = command          # the op_code below
+packet[8] = vendor & 0xff    # 0x11
+packet[9] = (vendor >> 8)    # 0x02   -> vendor = 0x0211
+packet[10:] = data           # arguments only, no 0x11 0x02 prefix
+```
+
+So the two transports carry the *same* mesh command with different framing: BLE gives the
+vendor its own field, while this project's TCP path embeds it at the head of the payload.
+That is why `acync`'s command bytes line up with the table above:
+
+| `acync` (BLE) | this table (TCP) |
+|---|---|
+| `0xD0` + `[power]` | `set_power` `0xD0`, `[0x11,0x02,state,0,0]` |
+| `0xD2` + `[brightness]` | `set_brightness` sol-lamp variant `0xD2` |
+| `0xE2` + `[0x05, temp]` | `set_temperature` sol-lamp variant `0xE2` |
+| `0xE2` + `[0x04, r, g, b]` | (RGB, via the same `0xE2` family) |
+| `0xDC` inbound | status notifications |
+
+Two things follow. The sol-lamp `0xD2`/`0xE2` variants are corroborated by an
+implementation that demonstrably controls real hardware — independent of this project's
+own decompilation, and from a different source lineage. And the opcode table is
+transport-independent: anything documented here should port to a BLE transport by moving
+`0x11, 0x02` out of the payload and into the vendor field, rather than by re-deriving it.
+
+### The transport-independence claim is now **confirmed on hardware** (2026-07-28)
+
+The paragraph above was reasoning from two implementations agreeing. It has since been
+tested directly, with `research`'s `probes/ble_control_probe.py`:
+
+- The Telink session handshake completed against a wired Cync switch, with
+  `verify_pairing_response` reporting **mutual auth verified** — the device proved it
+  had derived the same key material, so the credentials and the whole handshake are right.
+- Inbound traffic decrypted into sensible plaintext: vendor `0x0211` sitting at bytes
+  `8:9` exactly as the framing above predicts, plus readable ASCII in the payload.
+- A `set_power` (`0xD0`) built by moving `0x11, 0x02` into the vendor field **changed the
+  switch's state**, and `cync-lan` reported that change over its own TCP connection.
+
+That last point is the load-bearing one. The command left over Bluetooth and the
+confirmation arrived over TCP, so the two transports corroborate each other and the
+result cannot be a false positive.
+
+Brightness has since been confirmed over BLE too, and it produced a result the table
+above does not predict. **Both** forms changed the brightness of the same wired dimmer:
+
+- `0xF0` with `[0x01, bri, 0xFF, 0xFF, 0xFF, 0xFF]` — the non-sol form, which is what
+  `devices.py` sends to this device class over TCP;
+- `0xD2` with `[bri, 0x00, 0x00]` — the **sol-lamp** form, which by the table should not
+  have applied to a wired dimmer at all.
+
+So the sol-lamp split is real on the TCP side but is not, on this firmware, a hard
+gate over BLE. That does **not** make the two equivalent, and the distinction is
+deliberately kept in `ble_mesh.py`. The verification channel was cync-lan's own
+reporting, which surfaces the brightness level and little else — it would not reveal a
+difference in fade behaviour, in what the device persists across a power cycle, or in
+sub-percent precision. `set_fine_brightness` extends the `0xE2` family precisely because
+the basic form cannot express that last one, which is reason enough not to treat the two
+families as interchangeable on the strength of one observation.
+
+Scope, precisely: `0xD0` and both brightness forms are confirmed over BLE. Colour
+temperature and RGB are not — they ride the same `0xF0` family whose brightness member
+works, so they are better founded than a guess, but nobody has moved either.
+
+### Notifications work — an earlier note here said they did not
+
+That earlier claim was wrong, and it is worth saying why: it came from testing one
+sequence and generalising. What fails is **BlueZ's `StartNotify`**, which answers with
+GATT `Unlikely Error` — and the device does expose a `0x2902` CCCD, at handle 19, so it
+is refusing a legitimate subscribe.
+
+But the CCCD is not how this protocol turns reporting on. Writing `0x01` to
+characteristic `...1911`'s **value** is. `google/python-dimond` — the origin of this
+implementation lineage — does exactly that and never writes a CCCD at all; bluepy
+delivers notifications regardless. With the enable-write first, **16 status packets
+arrived and decrypted correctly** on a connection whose `StartNotify` had just been
+rejected.
+
+The inbound `0xDC` slot layout is `[id, presence, brightness, extra]`, two slots per
+packet — and the presence rule appears **inverted** relative to acync, which skips a
+slot whose second byte is zero. Across those 17 captured packets:
+
+| `byte[1]` | slots | contents |
+|---|---|---|
+| `== 0` | 9 | brightness `100`, extra `255` — plausible device state |
+| `!= 0` | 25 | uniformly `brightness=0, extra=0`, with `byte[1]` varying like noise |
+
+So a zero presence byte is treated here as *data-bearing*. **Plausible, not
+confirmed** — one capture, one mesh, and it contradicts an implementation known to work
+elsewhere. The `byte[1] != 0` records are unexplained and may be a different record type
+sharing the `0xDC` opcode.
+
+**The mesh credentials do not come from the hub.** They are in the cloud export that
+`cloud_api.py:_parse_raw_export` already writes: the home's `mac` is the Telink mesh
+name and its `access_key` is the mesh password, both confirmed by the run above. Worth
+stating plainly because the `query_mesh_credentials` button suggests otherwise, and that
+button is a hub command — a family that currently gets no reply at all (see
+`hub_envelope_ab_test.md`). Nothing about BLE control depends on it, or on DNS
+redirection.
+
 ## Provenance of already-confirmed cmd_code values
 
 Mystery solved for all five: every `cmd_code` in the table above traces to a **real socat-MITM
