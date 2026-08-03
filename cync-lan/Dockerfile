@@ -47,7 +47,7 @@ ARG BUILD_ARCH
 ARG BUILD_VERSION
 RUN set -x \
     && pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir "cync-lan-mqtt==0.2.2"
+    && pip install --no-cache-dir "cync-lan-mqtt==0.2.3"
 
 ENV CYNC_HOST="0.0.0.0" \
     CYNC_DEBUG=0 \
